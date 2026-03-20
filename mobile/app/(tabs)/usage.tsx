@@ -8,7 +8,7 @@ import { useStore } from '../../store';
 
 export default function UsageScreen() {
   const { apiFetch } = useApi();
-  const { setSystemInfo } = useStore();
+  const { sessions, setSystemInfo } = useStore();
 
   const {
     data: system,
@@ -24,17 +24,9 @@ export default function UsageScreen() {
     refetchInterval: 500,
   });
 
-  // Fetch real session list from server instead of stale store
-  const { data: serverSessions, refetch: refetchSessions } = useQuery({
-    queryKey: ['usage-server-sessions'],
-    queryFn: () => apiFetch('/api/sessions'),
-    refetchInterval: 10000,
-  });
-
-  // Fetch agents directly to count active ourselves
-  const { data: agents, refetch: refetchAgents } = useQuery({
-    queryKey: ['usage-agents'],
-    queryFn: () => apiFetch('/api/agents'),
+  const { data: agentStats, refetch: refetchStats } = useQuery({
+    queryKey: ['usage-stats'],
+    queryFn: () => apiFetch('/api/agents/stats'),
     refetchInterval: 10000,
   });
 
@@ -46,8 +38,7 @@ export default function UsageScreen() {
 
   const onRefresh = () => {
     refetchSys();
-    refetchSessions();
-    refetchAgents();
+    refetchStats();
   };
 
   // Calculate totals from all sessions (stats only shows current agent)
@@ -56,16 +47,7 @@ export default function UsageScreen() {
     : [];
   const totalTokens = allSessions.reduce((sum: number, s: any) => sum + (s.inputTokens || 0) + (s.outputTokens || 0), 0);
   const estimatedCost = allSessions.reduce((sum: number, s: any) => sum + (s.estimatedCost || 0), 0);
-
-  // Count sessions from server data
-  const sessionList = Array.isArray(serverSessions) ? serverSessions : [];
-  const activeSessions = sessionList.filter((s: any) => s.active).length;
-  const totalSessionCount = sessionList.length;
-
-  // Count active agents ourselves (same logic as agents tab)
-  const agentList = Array.isArray(agents) ? agents : [];
-  const inactiveStatuses = ['done', 'error', 'offline'];
-  const activeAgentCount = agentList.filter((a: any) => !inactiveStatuses.includes((a.status || '').toLowerCase())).length;
+  const activeSessions = sessions.filter((s) => s.active).length;
 
   return (
     <ScrollView
@@ -96,14 +78,14 @@ export default function UsageScreen() {
         <StatCard
           label="Actieve sessies"
           value={String(activeSessions)}
-          sub={`${totalSessionCount} totaal`}
+          sub={`${sessions.length} totaal`}
           color="#4ade80"
         />
         <StatCard
           label="Agents"
-          value={String(agentList.length)}
-          sub={`${activeAgentCount} actief`}
-          color="#983ef1"
+          value={String(agentStats?.total || 0)}
+          sub={`${agentStats?.active || 0} actief`}
+          color="#9c39ff"
         />
       </View>
 
