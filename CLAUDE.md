@@ -42,7 +42,10 @@ eas build --platform ios          # Build for TestFlight
 - **Server**: Plain JavaScript (CommonJS), Express + ws + node-pty. All source in `server/src/`. Each module exports named functions (no classes).
 - **Mobile**: TypeScript, Expo SDK 54, Expo Router v6 (file-based routing in `app/`), Zustand for global state, TanStack Query for server data fetching.
 - **Auth**: All REST endpoints except `POST /auth` and `GET /` require `Authorization: Bearer <jwt>`. WebSocket connects with `?token=<jwt>` query param.
-- **Terminal rendering**: xterm.js v5 runs inside a `react-native-webview` WebView with CDN-loaded scripts. Communication via `postMessage`. The `TerminalWebView` component has static `write()` and `clear()` methods. Custom momentum/glide touch scrolling is implemented via an overlay, with a "scroll to bottom" button when scrolled up.
+- **Terminal rendering**: xterm.js v5 runs inside a `react-native-webview` WebView with CDN-loaded scripts. Communication via `postMessage`. The `TerminalWebView` component has static `write()` and `clear()` methods.
+- **Terminal input**: A hidden `TextInput` (opacity 0, zIndex -1) captures keyboard input. `onChangeText` computes only the diff vs. the previous value (tracked in `prevInputText` ref) to avoid double-sending due to the iOS race condition between `setNativeProps({ text: '' })` and the next keystroke. `onKeyPress` handles backspace (`\x7f`). `onSubmitEditing` sends `\r` (Enter). Tap on the terminal overlay focuses this input to show the keyboard.
+- **Terminal scrolling**: A native `View` overlay with `PanResponder` handles touch scrolling (no xterm.js touch handling). Momentum/glide is computed in React Native and injected via `window.scrollLines()`. The xterm helper textarea is hidden (`display: none !important`) so xterm never receives direct keyboard input. A "scroll to bottom" button appears when scrolled up.
+- **EditorTerminal**: Same input/scroll architecture as `TerminalWebView`, but self-contained (manages its own session via `useWebSocket`) and rendered as a resizable bottom panel with snap points inside the editor screen.
 - **UI language**: All user-facing text in the mobile app is in Dutch.
 - **Dark theme**: `#0a0a0a` background, `#e0e0e0` text, `#4ade80` accent (green). Accent color is user-configurable and persisted via `expo-secure-store`.
 

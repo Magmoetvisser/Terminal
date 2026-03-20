@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState, Keyboard, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Keyboard, ScrollView, TextInput } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -18,14 +18,22 @@ const XTERM_HTML = `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
+    #wrap { position: relative; width: 100%; height: 100%; }
     #terminal { width: 100%; height: 100%; }
     .xterm { padding: 4px; }
     .xterm-viewport { overflow: hidden !important; }
     .xterm-helper-textarea { display: none !important; }
+    #overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 100; touch-action: none;
+    }
   </style>
 </head>
 <body>
-  <div id="terminal"></div>
+  <div id="wrap">
+    <div id="terminal"></div>
+    <div id="overlay"></div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
   <script>
@@ -42,7 +50,7 @@ const XTERM_HTML = `
       cursorBlink: true,
       convertEol: true,
       scrollback: 10000,
-      scrollOnUserInput: true,
+      scrollOnUserInput: false,
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -77,11 +85,87 @@ const XTERM_HTML = `
       }
     });
 
-    // Scroll by N lines (called from React Native)
-    window.scrollLines = (n) => { try { term.scrollLines(n); } catch(e) {} };
-    window.focusTerm = () => { try { term.focus(); } catch(e) {} };
+    // --- Touch overlay for scrolling ---
+    const overlay = document.getElementById('overlay');
+    const LINE_HEIGHT = 17;
+    const FRICTION = 0.93;
+    const MIN_VEL = 0.2;
+    const TAP_THRESHOLD = 10;
 
-    // Terminal I/O
+    let startY, startX, lastY, lastTime, isSwiping, momentumId;
+    let velocityY = 0, scrollAcc = 0;
+    let samples = [];
+
+    function stopMomentum() {
+      if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; }
+      velocityY = 0; scrollAcc = 0; samples = [];
+    }
+
+    function scrollPx(px) {
+      scrollAcc += px / LINE_HEIGHT;
+      const lines = Math.trunc(scrollAcc);
+      if (lines !== 0) { term.scrollLines(lines); scrollAcc -= lines; }
+    }
+
+    function glide() {
+      if (Math.abs(velocityY) < MIN_VEL) { momentumId = null; scrollAcc = 0; return; }
+      scrollPx(velocityY);
+      velocityY *= FRICTION;
+      momentumId = requestAnimationFrame(glide);
+    }
+
+    overlay.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      stopMomentum();
+      const t = e.touches[0];
+      startY = lastY = t.clientY;
+      startX = t.clientX;
+      lastTime = performance.now();
+      isSwiping = false;
+    });
+
+    overlay.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      const now = performance.now();
+      const dy = lastY - t.clientY;
+      const dt = now - lastTime;
+
+      if (!isSwiping) {
+        if (Math.abs(t.clientY - startY) > TAP_THRESHOLD || Math.abs(t.clientX - startX) > TAP_THRESHOLD) {
+          isSwiping = true;
+        }
+      }
+
+      if (isSwiping && dt > 0) {
+        scrollPx(dy);
+        samples.push({ v: dy / dt, t: now });
+        while (samples.length > 0 && now - samples[0].t > 100) samples.shift();
+      }
+
+      lastY = t.clientY;
+      lastTime = now;
+    });
+
+    overlay.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!isSwiping) {
+        // Tap — tell React Native to focus hidden input
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'focusInput' }));
+        return;
+      }
+      if (samples.length >= 2) {
+        let sum = 0;
+        for (const s of samples) sum += s.v;
+        velocityY = (sum / samples.length) * 16;
+        if (Math.abs(velocityY) > MIN_VEL) {
+          momentumId = requestAnimationFrame(glide);
+        }
+      }
+      samples = [];
+    });
+
+    // Terminal I/O — xterm keyboard disabled, input comes from React Native
     term.onData((data) => {
       try {
         if (isAtBottom) {
@@ -125,107 +209,13 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
     });
     const hideSub = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardHeight(0);
+      if (backspaceTimer.current) {
+        clearInterval(backspaceTimer.current);
+        backspaceTimer.current = null;
+      }
     });
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-
-  // Scroll state for momentum
-  const scrollState = useRef({
-    scrollAcc: 0,
-    velocityY: 0,
-    momentumId: null as number | null,
-    samples: [] as { v: number; t: number }[],
-    lastDy: 0,
-  });
-
-  const LINE_HEIGHT = 17;
-  const FRICTION = 0.93;
-  const MIN_VEL = 0.2;
-  const TAP_THRESHOLD = 15;
-
-  const injectScroll = useCallback((lines: number) => {
-    if (lines !== 0) {
-      webViewRef.current?.injectJavaScript(`window.scrollLines(${lines}); true;`);
-    }
-  }, []);
-
-  const scrollPx = useCallback((px: number) => {
-    const s = scrollState.current;
-    s.scrollAcc += px / LINE_HEIGHT;
-    const lines = Math.trunc(s.scrollAcc);
-    if (lines !== 0) {
-      s.scrollAcc -= lines;
-      injectScroll(lines);
-    }
-  }, [injectScroll]);
-
-  const stopMomentum = useCallback(() => {
-    const s = scrollState.current;
-    if (s.momentumId) {
-      cancelAnimationFrame(s.momentumId);
-      s.momentumId = null;
-    }
-    s.velocityY = 0;
-    s.scrollAcc = 0;
-    s.samples = [];
-  }, []);
-
-  const glide = useCallback(() => {
-    const s = scrollState.current;
-    if (Math.abs(s.velocityY) < MIN_VEL) {
-      s.momentumId = null;
-      s.scrollAcc = 0;
-      return;
-    }
-    scrollPx(s.velocityY);
-    s.velocityY *= FRICTION;
-    s.momentumId = requestAnimationFrame(glide);
-  }, [scrollPx]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, gs) =>
-        Math.abs(gs.dy) > TAP_THRESHOLD || Math.abs(gs.dx) > TAP_THRESHOLD,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        stopMomentum();
-        scrollState.current.samples = [];
-        scrollState.current.lastDy = 0;
-      },
-      onPanResponderMove: (_e: GestureResponderEvent, gs: PanResponderGestureState) => {
-        const s = scrollState.current;
-        const now = performance.now();
-        // gs.dy is cumulative - compute incremental delta
-        const incrementalDy = gs.dy - s.lastDy;
-        s.lastDy = gs.dy;
-        const dy = -incrementalDy; // negative because swipe up = scroll down
-        scrollPx(dy);
-        const dt = 16; // approximate frame time
-        s.samples.push({ v: dy / dt, t: now });
-        while (s.samples.length > 0 && now - s.samples[0].t > 100) s.samples.shift();
-      },
-      onPanResponderRelease: (_e, gs) => {
-        const s = scrollState.current;
-        const moved = Math.abs(gs.dy) > TAP_THRESHOLD || Math.abs(gs.dx) > TAP_THRESHOLD;
-        if (!moved) {
-          // Tap - focus hidden input to show keyboard
-          inputRef.current?.focus();
-          return;
-        }
-        // Start momentum from average velocity
-        if (s.samples.length >= 2) {
-          let sum = 0;
-          for (const sample of s.samples) sum += sample.v;
-          s.velocityY = (sum / s.samples.length) * 16;
-          if (Math.abs(s.velocityY) > MIN_VEL) {
-            s.momentumId = requestAnimationFrame(glide);
-          }
-        }
-        s.samples = [];
-      },
-    })
-  ).current;
 
   useEffect(() => {
     Animated.timing(btnOpacity, {
@@ -245,6 +235,8 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           onResize(msg.cols, msg.rows);
         } else if (msg.type === 'scrollState') {
           setShowScrollBtn(!msg.atBottom);
+        } else if (msg.type === 'focusInput') {
+          inputRef.current?.focus();
         }
       } catch {}
     },
@@ -256,7 +248,22 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
     setShowScrollBtn(false);
   }, []);
 
+  const prevInputText = useRef('');
+  const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
+
+  const startBackspace = useCallback(() => {
+    if (backspaceTimer.current) return;
+    onInput('\x7f');
+    backspaceTimer.current = setInterval(() => onInput('\x7f'), 80);
+  }, [onInput]);
+
+  const stopBackspace = useCallback(() => {
+    if (backspaceTimer.current) {
+      clearInterval(backspaceTimer.current);
+      backspaceTimer.current = null;
+    }
+  }, []);
 
   const sendKey = useCallback((key: string) => {
     if (toolbarScrolling.current) return;
@@ -305,6 +312,9 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           toolbarScrolling.current = false;
         }}
       >
+        <TouchableOpacity style={[styles.toolbarBtn, styles.enterBtn]} onPress={() => sendKey('\r')} activeOpacity={0.6}>
+          <Ionicons name="return-down-back" size={14} color="#4ade80" />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b')} activeOpacity={0.6}>
           <Text style={styles.toolbarBtnText}>ESC</Text>
         </TouchableOpacity>
@@ -339,6 +349,13 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           <Ionicons name="arrow-down" size={14} color="#aaa" />
         </TouchableOpacity>
       </ScrollView>
+        <TouchableOpacity
+          style={styles.dismissBtn}
+          onPress={() => { Keyboard.dismiss(); inputRef.current?.blur(); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chevron-down-outline" size={16} color="#888" />
+        </TouchableOpacity>
       </View>
 
       <TextInput
@@ -350,34 +367,37 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
         spellCheck={false}
         keyboardAppearance="dark"
         blurOnSubmit={false}
+        returnKeyType="send"
         value=""
-        onChangeText={(text) => { if (text) onInput(text); }}
+        onChangeText={(text) => {
+          stopBackspace();
+          if (text) onInput(text);
+        }}
         onKeyPress={({ nativeEvent }) => {
-          if (nativeEvent.key === 'Backspace') onInput('\x7f');
-          else if (nativeEvent.key === 'Enter') onInput('\r');
+          if (nativeEvent.key === 'Backspace') startBackspace();
+        }}
+        onSubmitEditing={() => {
+          stopBackspace();
+          onInput('\r');
         }}
       />
 
-      <View style={styles.terminalContainer}>
-        <WebView
-          ref={webViewRef}
-          source={{ html: XTERM_HTML }}
-          style={styles.webview}
-          javaScriptEnabled
-          onMessage={handleMessage}
-          scrollEnabled={false}
-          bounces={false}
-          overScrollMode="never"
-          hideKeyboardAccessoryView
-          automaticallyAdjustContentInsets={false}
-          contentInsetAdjustmentBehavior="never"
-          automaticallyAdjustsScrollIndicatorInsets={false}
-          onError={() => {}}
-          onHttpError={() => {}}
-        />
-        {/* Native touch overlay for scroll gestures */}
-        <View style={styles.touchOverlay} {...panResponder.panHandlers} />
-      </View>
+      <WebView
+        ref={webViewRef}
+        source={{ html: XTERM_HTML }}
+        style={styles.webview}
+        javaScriptEnabled
+        onMessage={handleMessage}
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        hideKeyboardAccessoryView
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustsScrollIndicatorInsets={false}
+        onError={() => {}}
+        onHttpError={() => {}}
+      />
 
       <Animated.View style={[styles.scrollBtnWrap, { opacity: btnOpacity }]} pointerEvents={showScrollBtn ? 'box-none' : 'none'}>
         <TouchableOpacity
@@ -415,9 +435,15 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#111',
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
+  },
+  dismissBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   toolbarContent: {
     flexDirection: 'row',
@@ -440,6 +466,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'monospace',
   },
+  enterBtn: {
+    backgroundColor: '#0a2a0a',
+    borderColor: '#1a4a1a',
+  },
   ctrlCBtn: {
     backgroundColor: '#2a1010',
     borderColor: '#5a2020',
@@ -450,21 +480,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'monospace',
   },
-  terminalContainer: {
-    flex: 1,
-    position: 'relative',
-  },
   webview: {
     flex: 1,
     backgroundColor: '#0a0a0a',
-  },
-  touchOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
   },
   scrollBtnWrap: {
     position: 'absolute',

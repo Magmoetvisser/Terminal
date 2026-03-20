@@ -345,7 +345,24 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
     setShowScrollBtn(false);
   }, []);
 
+  const prevInputText = useRef('');
+  const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
+
+  const startBackspace = useCallback(() => {
+    if (backspaceTimer.current) return;
+    if (sessionId) sendInput(sessionId, '\x7f');
+    backspaceTimer.current = setInterval(() => {
+      if (sessionId) sendInput(sessionId, '\x7f');
+    }, 80);
+  }, [sessionId, sendInput]);
+
+  const stopBackspace = useCallback(() => {
+    if (backspaceTimer.current) {
+      clearInterval(backspaceTimer.current);
+      backspaceTimer.current = null;
+    }
+  }, []);
 
   const sendKey = useCallback((key: string) => {
     if (toolbarScrolling.current) return;
@@ -402,6 +419,9 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
           toolbarScrolling.current = false;
         }}
       >
+        <TouchableOpacity style={[styles.toolbarBtn, styles.enterBtn]} onPress={() => sendKey('\r')} activeOpacity={0.6}>
+          <Ionicons name="return-down-back" size={14} color="#4ade80" />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b')} activeOpacity={0.6}>
           <Text style={styles.toolbarBtnText}>ESC</Text>
         </TouchableOpacity>
@@ -436,6 +456,13 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
           <Ionicons name="arrow-down" size={14} color="#aaa" />
         </TouchableOpacity>
       </ScrollView>
+        <TouchableOpacity
+          style={styles.dismissBtn}
+          onPress={() => { Keyboard.dismiss(); inputRef.current?.blur(); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chevron-down-outline" size={16} color="#888" />
+        </TouchableOpacity>
       </View>
 
       <TextInput
@@ -447,11 +474,18 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         spellCheck={false}
         keyboardAppearance="dark"
         blurOnSubmit={false}
+        returnKeyType="send"
         value=""
-        onChangeText={(text) => { if (text && sessionId) sendInput(sessionId, text); }}
+        onChangeText={(text) => {
+          stopBackspace();
+          if (text && sessionId) sendInput(sessionId, text);
+        }}
         onKeyPress={({ nativeEvent }) => {
-          if (nativeEvent.key === 'Backspace' && sessionId) sendInput(sessionId, '\x7f');
-          else if (nativeEvent.key === 'Enter' && sessionId) sendInput(sessionId, '\r');
+          if (nativeEvent.key === 'Backspace') startBackspace();
+        }}
+        onSubmitEditing={() => {
+          stopBackspace();
+          if (sessionId) sendInput(sessionId, '\r');
         }}
       />
 
@@ -542,9 +576,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#111',
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
+  },
+  dismissBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   toolbarContent: {
     flexDirection: 'row',
@@ -566,6 +606,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     fontFamily: 'monospace',
+  },
+  enterBtn: {
+    backgroundColor: '#0a2a0a',
+    borderColor: '#1a4a1a',
   },
   ctrlCBtn: {
     backgroundColor: '#2a1010',
