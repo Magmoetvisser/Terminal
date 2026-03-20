@@ -1,9 +1,45 @@
+# Dependencies
 node_modules/
+
+# Environment
 .env
-server/certs/
+.env*.local
+
+# Expo
 .expo/
 dist/
+web-build/
+expo-env.d.ts
+
+# Native builds
+/mobile/ios
+/mobile/android
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Server certs
+server/certs/
+
+# Metro
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# TypeScript
 *.tsbuildinfo
+
+# OS
 .DS_Store
 Thumbs.db
+*.pem
+
+# Claude
 CLAUDE.md
