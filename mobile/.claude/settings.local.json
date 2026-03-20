@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /c/Users/ravir/Documents/Hussle/terminal/mobile/*.json /c/Users/ravir/Documents/Hussle/terminal/mobile/*.ts)",
+      "Bash(rtk npx:*)",
+      "Bash(npx expo:*)",
+      "Bash(npm ls:*)"
+    ]
+  }
+}

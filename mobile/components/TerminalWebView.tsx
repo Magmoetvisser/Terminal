@@ -1,0 +1,487 @@
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState, Keyboard, ScrollView, TextInput } from 'react-native';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+
+interface Props {
+  onInput: (data: string) => void;
+  onResize?: (cols: number, rows: number) => void;
+}
+
+const XTERM_HTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/css/xterm.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
+    #terminal { width: 100%; height: 100%; }
+    .xterm { padding: 4px; }
+    .xterm-viewport { overflow: hidden !important; }
+    .xterm-helper-textarea { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
+  <script>
+    try {
+    const term = new Terminal({
+      theme: {
+        background: '#0a0a0a',
+        foreground: '#e0e0e0',
+        cursor: '#e0e0e0',
+        selectionBackground: '#354a5f',
+      },
+      fontSize: 13,
+      fontFamily: 'Menlo, Monaco, Courier New, monospace',
+      cursorBlink: true,
+      convertEol: true,
+      scrollback: 10000,
+      scrollOnUserInput: true,
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+
+    let fitTimer;
+    function debouncedFit() {
+      clearTimeout(fitTimer);
+      fitTimer = setTimeout(() => {
+        try {
+          fitAddon.fit();
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'resize', cols: term.cols, rows: term.rows,
+          }));
+        } catch(e) {}
+      }, 150);
+    }
+    debouncedFit();
+    new ResizeObserver(debouncedFit).observe(document.getElementById('terminal'));
+
+    // --- Scroll position tracking ---
+    let isAtBottom = true;
+    term.onScroll(() => {
+      const buf = term.buffer.active;
+      const atBottom = buf.viewportY >= buf.baseY;
+      if (atBottom !== isAtBottom) {
+        isAtBottom = atBottom;
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'scrollState', atBottom: isAtBottom,
+        }));
+      }
+    });
+
+    // Scroll by N lines (called from React Native)
+    window.scrollLines = (n) => { try { term.scrollLines(n); } catch(e) {} };
+    window.focusTerm = () => { try { term.focus(); } catch(e) {} };
+
+    // Terminal I/O
+    term.onData((data) => {
+      try {
+        if (isAtBottom) {
+          term.scrollToBottom();
+        }
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'input', data }));
+      } catch(e) {}
+    });
+
+    window.writeTerminal = (data) => {
+      try {
+        const shouldScroll = isAtBottom;
+        term.write(data, () => {
+          if (shouldScroll) {
+            term.scrollToBottom();
+          }
+        });
+      } catch(e) {}
+    };
+    window.clearTerminal = () => { try { term.clear(); } catch(e) {} };
+    window.scrollToBottom = () => { try { term.scrollToBottom(); isAtBottom = true; window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scrollState', atBottom: true })); } catch(e) {} };
+
+    } catch(e) {
+      document.body.innerText = 'Terminal error: ' + e.message;
+    }
+  </script>
+</body>
+</html>
+`;
+
+export default function TerminalWebView({ onInput, onResize }: Props) {
+  const webViewRef = useRef<WebView>(null);
+  const inputRef = useRef<TextInput>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const btnOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  // Scroll state for momentum
+  const scrollState = useRef({
+    scrollAcc: 0,
+    velocityY: 0,
+    momentumId: null as number | null,
+    samples: [] as { v: number; t: number }[],
+    lastDy: 0,
+  });
+
+  const LINE_HEIGHT = 17;
+  const FRICTION = 0.93;
+  const MIN_VEL = 0.2;
+  const TAP_THRESHOLD = 15;
+
+  const injectScroll = useCallback((lines: number) => {
+    if (lines !== 0) {
+      webViewRef.current?.injectJavaScript(`window.scrollLines(${lines}); true;`);
+    }
+  }, []);
+
+  const scrollPx = useCallback((px: number) => {
+    const s = scrollState.current;
+    s.scrollAcc += px / LINE_HEIGHT;
+    const lines = Math.trunc(s.scrollAcc);
+    if (lines !== 0) {
+      s.scrollAcc -= lines;
+      injectScroll(lines);
+    }
+  }, [injectScroll]);
+
+  const stopMomentum = useCallback(() => {
+    const s = scrollState.current;
+    if (s.momentumId) {
+      cancelAnimationFrame(s.momentumId);
+      s.momentumId = null;
+    }
+    s.velocityY = 0;
+    s.scrollAcc = 0;
+    s.samples = [];
+  }, []);
+
+  const glide = useCallback(() => {
+    const s = scrollState.current;
+    if (Math.abs(s.velocityY) < MIN_VEL) {
+      s.momentumId = null;
+      s.scrollAcc = 0;
+      return;
+    }
+    scrollPx(s.velocityY);
+    s.velocityY *= FRICTION;
+    s.momentumId = requestAnimationFrame(glide);
+  }, [scrollPx]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, gs) =>
+        Math.abs(gs.dy) > TAP_THRESHOLD || Math.abs(gs.dx) > TAP_THRESHOLD,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        stopMomentum();
+        scrollState.current.samples = [];
+        scrollState.current.lastDy = 0;
+      },
+      onPanResponderMove: (_e: GestureResponderEvent, gs: PanResponderGestureState) => {
+        const s = scrollState.current;
+        const now = performance.now();
+        // gs.dy is cumulative - compute incremental delta
+        const incrementalDy = gs.dy - s.lastDy;
+        s.lastDy = gs.dy;
+        const dy = -incrementalDy; // negative because swipe up = scroll down
+        scrollPx(dy);
+        const dt = 16; // approximate frame time
+        s.samples.push({ v: dy / dt, t: now });
+        while (s.samples.length > 0 && now - s.samples[0].t > 100) s.samples.shift();
+      },
+      onPanResponderRelease: (_e, gs) => {
+        const s = scrollState.current;
+        const moved = Math.abs(gs.dy) > TAP_THRESHOLD || Math.abs(gs.dx) > TAP_THRESHOLD;
+        if (!moved) {
+          // Tap - focus hidden input to show keyboard
+          inputRef.current?.focus();
+          return;
+        }
+        // Start momentum from average velocity
+        if (s.samples.length >= 2) {
+          let sum = 0;
+          for (const sample of s.samples) sum += sample.v;
+          s.velocityY = (sum / s.samples.length) * 16;
+          if (Math.abs(s.velocityY) > MIN_VEL) {
+            s.momentumId = requestAnimationFrame(glide);
+          }
+        }
+        s.samples = [];
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    Animated.timing(btnOpacity, {
+      toValue: showScrollBtn ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showScrollBtn]);
+
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.type === 'input') {
+          onInput(msg.data);
+        } else if (msg.type === 'resize' && onResize) {
+          onResize(msg.cols, msg.rows);
+        } else if (msg.type === 'scrollState') {
+          setShowScrollBtn(!msg.atBottom);
+        }
+      } catch {}
+    },
+    [onInput, onResize],
+  );
+
+  const scrollToBottom = useCallback(() => {
+    webViewRef.current?.injectJavaScript(`window.scrollToBottom(); true;`);
+    setShowScrollBtn(false);
+  }, []);
+
+  const toolbarScrolling = useRef(false);
+
+  const sendKey = useCallback((key: string) => {
+    if (toolbarScrolling.current) return;
+    onInput(key);
+  }, [onInput]);
+
+  const pasteFromClipboard = useCallback(async () => {
+    if (toolbarScrolling.current) return;
+    const text = await Clipboard.getStringAsync();
+    if (text) onInput(text);
+  }, [onInput]);
+
+  const write = useCallback((data: string) => {
+    const escaped = JSON.stringify(data);
+    webViewRef.current?.injectJavaScript(`window.writeTerminal(${escaped}); true;`);
+  }, []);
+
+  const clear = useCallback(() => {
+    webViewRef.current?.injectJavaScript(`window.clearTerminal(); true;`);
+  }, []);
+
+  useEffect(() => {
+    (TerminalWebView as any)._write = write;
+    (TerminalWebView as any)._clear = clear;
+  }, [write, clear]);
+
+  return (
+    <View style={[styles.wrapper, { marginBottom: keyboardHeight }]}>
+      {/* Shortcut toolbar */}
+      <View style={styles.toolbar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.toolbarContent}
+        keyboardShouldPersistTaps="always"
+        nestedScrollEnabled
+        onScrollBeginDrag={() => { toolbarScrolling.current = true; }}
+        onScrollEndDrag={() => {
+          Keyboard.dismiss();
+          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
+          setTimeout(() => { toolbarScrolling.current = false; }, 200);
+        }}
+        onMomentumScrollEnd={() => {
+          Keyboard.dismiss();
+          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
+          toolbarScrolling.current = false;
+        }}
+      >
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>ESC</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.toolbarBtn, styles.ctrlCBtn]} onPress={() => sendKey('\x03')} activeOpacity={0.6}>
+          <Text style={styles.ctrlCBtnText}>Ctrl+C</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\t')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>TAB</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[Z')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>⇧TAB</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x04')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>Ctrl+D</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1a')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>Ctrl+Z</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x01')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>Ctrl+A</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x18')} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>Ctrl+X</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={pasteFromClipboard} activeOpacity={0.6}>
+          <Text style={styles.toolbarBtnText}>Plak</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[A')} activeOpacity={0.6}>
+          <Ionicons name="arrow-up" size={14} color="#aaa" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[B')} activeOpacity={0.6}>
+          <Ionicons name="arrow-down" size={14} color="#aaa" />
+        </TouchableOpacity>
+      </ScrollView>
+      </View>
+
+      <TextInput
+        ref={inputRef}
+        style={styles.hiddenInput}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        spellCheck={false}
+        keyboardAppearance="dark"
+        blurOnSubmit={false}
+        value=""
+        onChangeText={(text) => { if (text) onInput(text); }}
+        onKeyPress={({ nativeEvent }) => {
+          if (nativeEvent.key === 'Backspace') onInput('\x7f');
+          else if (nativeEvent.key === 'Enter') onInput('\r');
+        }}
+      />
+
+      <View style={styles.terminalContainer}>
+        <WebView
+          ref={webViewRef}
+          source={{ html: XTERM_HTML }}
+          style={styles.webview}
+          javaScriptEnabled
+          onMessage={handleMessage}
+          scrollEnabled={false}
+          bounces={false}
+          overScrollMode="never"
+          hideKeyboardAccessoryView
+          automaticallyAdjustContentInsets={false}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustsScrollIndicatorInsets={false}
+          onError={() => {}}
+          onHttpError={() => {}}
+        />
+        {/* Native touch overlay for scroll gestures */}
+        <View style={styles.touchOverlay} {...panResponder.panHandlers} />
+      </View>
+
+      <Animated.View style={[styles.scrollBtnWrap, { opacity: btnOpacity }]} pointerEvents={showScrollBtn ? 'box-none' : 'none'}>
+        <TouchableOpacity
+          style={styles.scrollBtn}
+          onPress={scrollToBottom}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-down" size={22} color="#0a0a0a" />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
+
+TerminalWebView.write = (data: string) => {
+  (TerminalWebView as any)._write?.(data);
+};
+
+TerminalWebView.clear = () => {
+  (TerminalWebView as any)._clear?.();
+};
+
+const styles = StyleSheet.create({
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 1,
+    height: 1,
+    opacity: 0,
+    zIndex: -1,
+  },
+  wrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  toolbar: {
+    backgroundColor: '#111',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  toolbarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  toolbarBtn: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    marginRight: 6,
+  },
+  toolbarBtnText: {
+    color: '#aaa',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  ctrlCBtn: {
+    backgroundColor: '#2a1010',
+    borderColor: '#5a2020',
+  },
+  ctrlCBtnText: {
+    color: '#f87171',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  terminalContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+  },
+  touchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+  },
+  scrollBtnWrap: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+  },
+  scrollBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#4ade80',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+});
