@@ -15,6 +15,7 @@ interface Props {
   loading?: boolean;
   onPress: (item: FileItem) => void;
   onLongPress?: (item: FileItem) => void;
+  onMenuPress?: (item: FileItem) => void;
   currentPath?: string;
   onNavigateUp?: () => void;
 }
@@ -47,7 +48,7 @@ function formatSize(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-export default function FileTree({ items, loading, onPress, onLongPress, currentPath, onNavigateUp }: Props) {
+export default function FileTree({ items, loading, onPress, onLongPress, onMenuPress, currentPath, onNavigateUp }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
@@ -81,7 +82,16 @@ export default function FileTree({ items, loading, onPress, onLongPress, current
               {!item.isDirectory && (
                 <Text style={styles.size}>{formatSize(item.size)}</Text>
               )}
-              {item.isDirectory && (
+              {onMenuPress && (
+                <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation(); onMenuPress(item); }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={styles.menuBtn}
+                >
+                  <Ionicons name="ellipsis-vertical" size={16} color="#666" />
+                </TouchableOpacity>
+              )}
+              {item.isDirectory && !onMenuPress && (
                 <Ionicons name="chevron-forward" size={14} color="#444" />
               )}
             </TouchableOpacity>
@@ -133,4 +143,5 @@ const styles = StyleSheet.create({
   name: { color: '#e0e0e0', fontSize: 14, flex: 1 },
   size: { color: '#555', fontSize: 11, fontFamily: 'monospace' },
   emptyText: { color: '#555', fontSize: 14 },
+  menuBtn: { paddingLeft: 8 },
 });

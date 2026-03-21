@@ -1,6 +1,6 @@
 # Hussle Terminal
 
-Remote terminal voor je Windows PC, recht vanaf je iPhone. Bedien Claude Code sessies, bekijk Pixel Agent Desk agents, bewerk bestanden en monitor systeemgebruik — overal, niet alleen op je thuis-WiFi.
+Remote terminal voor je Windows PC, recht vanaf je iPhone. Bedien Claude Code sessies, beheer GitHub repos, bewerk bestanden en monitor systeemgebruik — overal, niet alleen op je thuis-WiFi.
 
 ![Platform](https://img.shields.io/badge/platform-iOS-000?logo=apple&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo_SDK_54-000?logo=expo&logoColor=white)
@@ -18,42 +18,82 @@ Cloudflare Tunnel (publiek adres)
 Windows PC ─── Node.js Server (Express + ws)
                   ├── node-pty → PowerShell sessies
                   ├── Pixel Agent Desk proxy (localhost:3000)
-                  ├── File system API (lezen/schrijven/browsen)
+                  ├── File system API (lezen/schrijven/browsen/hernoemen/verwijderen)
                   └── systeminformation → CPU/RAM
+
+iPhone ──── GitHub REST API (directe connectie met fine-grained PAT)
 ```
 
 ## Features
 
 ### Terminal
 - Volledige xterm.js terminal in een WebView
-- Meerdere gelijktijdige sessies
+- Meerdere gelijktijdige sessies met sessie-selector
 - Touch scrolling met momentum/inertia
 - Sneltoets-toolbar: `ESC`, `Ctrl+C`, `TAB`, `↑`, `↓`, `Ctrl+D`, `Ctrl+Z`, plakken
 - Scroll-to-bottom knop
+
+### GitHub Management
+- Repository browser met zoeken en filteren (sterren, forks, taal, zichtbaarheid)
+- **Bestanden** — navigeer door repo bestandsboom, bekijk bestanden met syntax highlighting
+- **Commits** — commit geschiedenis met uitklapbare diff view (gekleurde add/remove regels)
+- **Branches** — lijst, aanmaken, verwijderen
+- **Issues** — volledige CRUD: aanmaken, bekijken, reageren, sluiten/heropenen, labels
+- **Pull Requests** — aanmaken (met head/base branch kiezers), bekijken, reageren, mergen (merge/squash/rebase selector), sluiten/heropenen, diff per gewijzigd bestand
+- **Actions** — workflow runs bekijken met status
+- **Releases** — releases met downloadbare assets
+- **Git operaties** — Clone, Pull, Push knoppen verbonden met terminal sessies
+- Slide-up detail modal met drag-to-resize (translateY animatie, snap points)
+
+### Code Editor
+- VS Code-achtige bestandsboom met type-iconen (JS, TS, Python, HTML, CSS, JSON, etc.)
+- Project browser — selecteer een map op de server
+- Bestanden lezen, bewerken, opslaan met onopgeslagen-wijzigingen indicator
+- Sneltoets-toolbar boven de editor: Enter, TAB, Undo, Redo, Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+- Context menu (3-puntjes) op bestanden/mappen: hernoemen, verwijderen
+- Nieuwe bestanden en mappen aanmaken via toolbar
+- Zwevend terminal paneel (versleepbaar met snap points) via FAB knop
+- WebView-gebaseerde editor met regelnummers en tab-ondersteuning
 
 ### Agents (Pixel Agent Desk)
 - Live overzicht van alle Claude Code agents
 - Status, model, tokens, kosten per agent
 - Conversatiegeschiedenis bekijken (chat-stijl)
 - Direct een terminal openen in het project van een agent
+- Ingebouwde code editor per agent
 
-### Code Editor
-- VS Code-achtige bestandsboom met syntax highlighting
-- Bestanden lezen, bewerken, aanmaken, verwijderen, hernoemen
-- Zwevend terminal paneel (versleepbaar) voor Claude Code in de editor
-- Map-browser voor navigatie
+### Monitoring
+- **Logs** — terminal logs per sessie doorzoeken met filter
+- **Usage** — token usage dashboard met kosten
+- **Kosten** — gedetailleerd kosten-overzicht
+- CPU/RAM real-time monitoring
 
-### Overig
-- Usage dashboard: tokens, kosten, CPU/RAM van de PC
-- Terminal logs per sessie doorzoeken
-- Kosten-overzicht
-- Accent kleur aanpasbaar via instellingen
+### Instellingen
+- Accent kleur aanpasbaar (persistent via SecureStore)
+- Server connectie info
+- GitHub Personal Access Token beheer
+
+## Navigatie
+
+Custom drawer navigatie met geanimeerd slide-in paneel:
+
+| Sectie | Tab | Beschrijving |
+|--------|-----|-------------|
+| Hoofd | Terminal | Remote PowerShell sessies |
+| Hoofd | Agents | Pixel Agent Desk monitoring |
+| Hoofd | GitHub | Volledige GitHub management |
+| Hoofd | Editor | VS Code-achtige code editor |
+| Monitor | Logs | Terminal log viewer |
+| Monitor | Usage | Token/kosten dashboard |
+| Monitor | Kosten | Kosten tracking |
+| Overig | Instellingen | App instellingen |
 
 ## Vereisten
 
 - **Windows PC** met Node.js 18+ en [Windows Build Tools](https://github.com/nicedoc/windows-build-tools) (voor node-pty)
 - **iPhone** met [Expo Go](https://expo.dev/go) (development) of TestFlight (productie)
 - Optioneel: [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) voor toegang buiten je netwerk
+- Optioneel: [GitHub fine-grained PAT](https://github.com/settings/tokens?type=beta) voor GitHub features
 
 ## Installatie
 
@@ -100,29 +140,36 @@ terminal/
 │
 └── mobile/
     ├── app/
+    │   ├── _layout.tsx       # Auth redirect
     │   ├── login.tsx         # Login scherm
-    │   ├── (tabs)/
-    │   │   ├── terminal.tsx  # Terminal met sessie-selector
-    │   │   ├── agents.tsx    # Agent overzicht + detail modal
-    │   │   ├── logs.tsx      # Terminal log viewer
-    │   │   ├── usage.tsx     # Usage dashboard
-    │   │   ├── costs.tsx     # Kosten overzicht
-    │   │   └── settings.tsx  # Instellingen
-    │   ├── editor/[path].tsx # Code editor
-    │   └── agent-history/[id].tsx # Agent chat geschiedenis
+    │   └── (tabs)/
+    │       ├── _layout.tsx   # Drawer navigatie
+    │       ├── terminal.tsx  # Terminal met sessie-selector
+    │       ├── agents.tsx    # Agent overzicht + detail modal
+    │       ├── github.tsx    # GitHub management (repos, issues, PRs, etc.)
+    │       ├── editor.tsx    # Code editor met bestandsboom
+    │       ├── logs.tsx      # Terminal log viewer
+    │       ├── usage.tsx     # Usage dashboard
+    │       ├── costs.tsx     # Kosten overzicht
+    │       └── settings.tsx  # Instellingen
     ├── components/
     │   ├── TerminalWebView.tsx   # xterm.js WebView + scroll + toolbar
     │   ├── EditorTerminal.tsx    # Zwevend terminal paneel
+    │   ├── CodeEditor.tsx        # WebView code editor met ref (execCommand/insertText)
+    │   ├── FileTree.tsx          # Bestandsboom met 3-puntjes menu
     │   ├── AgentCard.tsx         # Agent kaart component
-    │   ├── CodeEditor.tsx        # Monaco-achtige editor
-    │   ├── FileTree.tsx          # Bestandsboom
     │   ├── FolderBrowser.tsx     # Map-kiezer modal
     │   ├── CreateModal.tsx       # Aanmaak-opties modal
-    │   └── UsageStats.tsx        # Token/kosten visualisatie
+    │   ├── UsageStats.tsx        # Token/kosten visualisatie
+    │   └── WebViewCompat.tsx     # Cross-platform WebView wrapper
     ├── hooks/
-    │   ├── useAuth.ts        # JWT opslag + login
+    │   ├── useAuth.ts        # JWT opslag + login/logout
     │   ├── useApi.ts         # Authenticated fetch wrapper
-    │   └── useWebSocket.ts   # WebSocket + auto-reconnect
+    │   ├── useWebSocket.ts   # WebSocket + auto-reconnect
+    │   └── useGitHub.ts      # GitHub REST API helpers (ghFetch/ghPost/ghPatch/etc.)
+    ├── utils/
+    │   ├── alert.ts          # Cross-platform alert (web fallback)
+    │   └── storage.ts        # SecureStore wrapper
     └── store/
         └── index.ts          # Zustand global state
 ```
@@ -154,7 +201,9 @@ ingress:
 |-----------|------------|
 | Mobile | React Native, Expo SDK 54, Expo Router v6, TypeScript |
 | State | Zustand, TanStack Query |
-| Terminal | xterm.js (via WebView), node-pty |
+| Terminal | xterm.js v5 (via WebView), node-pty |
 | Server | Express, ws, Node.js |
 | Auth | JWT (jsonwebtoken), expo-secure-store |
+| GitHub | GitHub REST API, fine-grained PAT |
+| Editor | WebView textarea, forwardRef + injectJavaScript |
 | Tunnel | Cloudflare Tunnel |

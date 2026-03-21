@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { showAlert } from '../utils/alert';
 import { useApi } from '../hooks/useApi';
 
 interface DirEntry {
@@ -44,7 +44,7 @@ export default function FolderBrowser({ visible, onClose, onSelect, title = 'Kie
         setParentPath(data.parent);
         setDirs(data.dirs);
       } catch (err: any) {
-        Alert.alert('Error', err.message);
+        showAlert('Error', err.message);
       } finally {
         setLoading(false);
       }
@@ -68,7 +68,7 @@ export default function FolderBrowser({ visible, onClose, onSelect, title = 'Kie
       setNewFolderName('');
       browse(currentPath);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     }
   };
 

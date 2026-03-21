@@ -50,6 +50,8 @@ interface AppState {
   agents: Agent[];
   systemInfo: SystemInfo | null;
   accentColor: string;
+  githubToken: string | null;
+  pendingTerminalInput: string | null;
 
   setServerUrl: (url: string) => void;
   setToken: (token: string | null) => void;
@@ -60,6 +62,8 @@ interface AppState {
   setAgents: (agents: Agent[]) => void;
   setSystemInfo: (info: SystemInfo) => void;
   setAccentColor: (color: string) => void;
+  setGithubToken: (token: string | null) => void;
+  setPendingTerminalInput: (input: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -70,6 +74,8 @@ export const useStore = create<AppState>((set) => ({
   agents: [],
   systemInfo: null,
   accentColor: '#4ade80',
+  githubToken: null,
+  pendingTerminalInput: null,
 
   setServerUrl: (url) => set({ serverUrl: url }),
   setToken: (token) => set({ token }),
@@ -85,4 +91,6 @@ export const useStore = create<AppState>((set) => ({
   setAgents: (agents) => set({ agents }),
   setSystemInfo: (info) => set({ systemInfo: info }),
   setAccentColor: (color) => set({ accentColor: color }),
+  setGithubToken: (token) => set({ githubToken: token }),
+  setPendingTerminalInput: (input) => set({ pendingTerminalInput: input }),
 }));

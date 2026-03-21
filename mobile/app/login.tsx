@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { router } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
 
@@ -21,7 +21,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!serverUrl.trim() || !password.trim()) {
-      Alert.alert('Vul beide velden in');
+      showAlert('Vul beide velden in');
       return;
     }
     setLoading(true);
@@ -29,7 +29,7 @@ export default function LoginScreen() {
       await login(serverUrl.trim(), password);
       router.replace('/(tabs)/terminal' as any);
     } catch (err: any) {
-      Alert.alert('Login mislukt', err.message);
+      showAlert('Login mislukt', err.message);
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ export default function LoginScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="Server URL (bijv. https://192.168.1.10:3443)"
+          placeholder="Server URL (bijv. http://192.168.1.10:3443)"
           placeholderTextColor="#555"
           value={serverUrl}
           onChangeText={setServerUrl}

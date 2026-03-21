@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   TextInput,
   Modal,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { showAlert } from '../../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import FileTree, { FileItem } from '../../components/FileTree';
 import CodeEditor from '../../components/CodeEditor';
@@ -51,7 +51,7 @@ export default function EditorScreen() {
         setItems(data.items || []);
         setCurrentDir(data.path);
       } catch (err: any) {
-        Alert.alert('Error', err.message);
+        showAlert('Error', err.message);
       } finally {
         setLoading(false);
       }
@@ -67,7 +67,7 @@ export default function EditorScreen() {
     try {
       const data = await apiFetch(`/api/files/read?path=${encodeURIComponent(item.path)}`);
       if (data.binary) {
-        Alert.alert('Binair bestand', 'Dit bestand kan niet bewerkt worden.');
+        showAlert('Binair bestand', 'Dit bestand kan niet bewerkt worden.');
         return;
       }
       setOpenFile({ path: item.path, name: data.name, language: data.language });
@@ -75,7 +75,7 @@ export default function EditorScreen() {
       setOriginalContent(data.content);
       setMode('editor');
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     }
   };
 
@@ -88,7 +88,7 @@ export default function EditorScreen() {
   };
 
   const handleLongPress = (item: FileItem) => {
-    Alert.alert(
+    showAlert(
       item.name,
       item.path,
       [
@@ -96,7 +96,7 @@ export default function EditorScreen() {
           text: 'Verwijderen',
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Weet je het zeker?', `${item.name} verwijderen?`, [
+            showAlert('Weet je het zeker?', `${item.name} verwijderen?`, [
               { text: 'Annuleer', style: 'cancel' },
               {
                 text: 'Verwijder',
@@ -106,7 +106,7 @@ export default function EditorScreen() {
                     await apiFetch(`/api/files?path=${encodeURIComponent(item.path)}`, { method: 'DELETE' });
                     loadDir(currentDir);
                   } catch (err: any) {
-                    Alert.alert('Error', err.message);
+                    showAlert('Error', err.message);
                   }
                 },
               },
@@ -134,9 +134,9 @@ export default function EditorScreen() {
         body: JSON.stringify({ path: openFile.path, content: fileContent }),
       });
       setOriginalContent(fileContent);
-      Alert.alert('Opgeslagen');
+      showAlert('Opgeslagen');
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     } finally {
       setSaving(false);
     }
@@ -144,7 +144,7 @@ export default function EditorScreen() {
 
   const closeEditor = () => {
     if (fileContent !== originalContent) {
-      Alert.alert('Niet-opgeslagen wijzigingen', 'Wil je opslaan?', [
+      showAlert('Niet-opgeslagen wijzigingen', 'Wil je opslaan?', [
         { text: 'Verwerp', style: 'destructive', onPress: () => { setMode('tree'); setOpenFile(null); } },
         { text: 'Opslaan', onPress: async () => { await saveFile(); setMode('tree'); setOpenFile(null); } },
         { text: 'Annuleer', style: 'cancel' },
@@ -167,7 +167,7 @@ export default function EditorScreen() {
       setCreateName('');
       loadDir(currentDir);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     }
   };
 

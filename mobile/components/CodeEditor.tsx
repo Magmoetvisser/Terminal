@@ -1,6 +1,10 @@
-import React, { useRef, useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import React, { useRef, useCallback, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
+import { StyleSheet, Platform, View, Text } from 'react-native';
+
+export interface CodeEditorRef {
+  execCommand: (cmd: string) => void;
+  insertText: (text: string) => void;
+}
 
 interface Props {
   content: string;
@@ -13,69 +17,42 @@ const EDITOR_HTML = `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0a0a0a; }
+    html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
+    #container { display: flex; width: 100%; height: 100%; }
+    #line-numbers {
+      position: relative; overflow: hidden;
+      min-width: 40px; padding: 8px 8px 8px 8px;
+      background: #0f0f0f; color: #555; font: 13px/1.5 'Menlo', 'Monaco', 'Courier New', monospace;
+      text-align: right; user-select: none; border-right: 1px solid #1a1a1a;
+    }
+    #line-numbers .inner { position: relative; }
     #editor {
-      width: 100%;
-      height: 100%;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      padding: 12px;
-      border: none;
-      outline: none;
-      resize: none;
-      white-space: pre;
-      overflow: auto;
-      tab-size: 2;
-      -webkit-text-size-adjust: none;
+      flex: 1; padding: 8px; border: none; resize: none; outline: none;
+      background: #0a0a0a; color: #e0e0e0; font: 13px/1.5 'Menlo', 'Monaco', 'Courier New', monospace;
+      white-space: pre; overflow: auto; tab-size: 2;
     }
-    .line-numbers {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 40px;
-      height: 100%;
-      background: #111;
-      color: #444;
-      font-family: monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      padding: 12px 4px;
-      text-align: right;
-      user-select: none;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .with-lines #editor { padding-left: 48px; }
   </style>
 </head>
-<body class="with-lines">
-  <div class="line-numbers" id="lines"></div>
-  <textarea id="editor" spellcheck="false"></textarea>
+<body>
+  <div id="container">
+    <div id="line-numbers"><div class="inner" id="lines"></div></div>
+    <textarea id="editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+  </div>
   <script>
     const editor = document.getElementById('editor');
     const lines = document.getElementById('lines');
-    let debounce;
 
     function updateLines() {
       const count = editor.value.split('\\n').length;
-      lines.innerHTML = Array.from({length: count}, (_, i) => i + 1).join('<br>');
+      lines.innerHTML = Array.from({ length: count }, (_, i) => i + 1).join('<br>');
     }
 
     editor.addEventListener('input', () => {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'change',
-          content: editor.value,
-        }));
-      }, 300);
       updateLines();
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'change', content: editor.value }));
     });
 
     editor.addEventListener('scroll', () => {
@@ -101,18 +78,111 @@ const EDITOR_HTML = `
 
     window.getContent = () => editor.value;
 
+    window.execCommand = (cmd) => {
+      editor.focus();
+      if (cmd === 'selectAll') {
+        editor.selectionStart = 0;
+        editor.selectionEnd = editor.value.length;
+      } else if (cmd === 'copy') {
+        document.execCommand('copy');
+      } else if (cmd === 'cut') {
+        document.execCommand('cut');
+        editor.dispatchEvent(new Event('input'));
+      } else if (cmd === 'paste') {
+        navigator.clipboard.readText().then(t => {
+          const s = editor.selectionStart, e = editor.selectionEnd;
+          editor.value = editor.value.substring(0, s) + t + editor.value.substring(e);
+          editor.selectionStart = editor.selectionEnd = s + t.length;
+          editor.dispatchEvent(new Event('input'));
+        }).catch(() => {});
+      } else if (cmd === 'undo') {
+        document.execCommand('undo');
+        editor.dispatchEvent(new Event('input'));
+      } else if (cmd === 'redo') {
+        document.execCommand('redo');
+        editor.dispatchEvent(new Event('input'));
+      } else if (cmd === 'newline') {
+        const s = editor.selectionStart, e = editor.selectionEnd;
+        editor.value = editor.value.substring(0, s) + '\\n' + editor.value.substring(e);
+        editor.selectionStart = editor.selectionEnd = s + 1;
+        editor.dispatchEvent(new Event('input'));
+      }
+    };
+
+    window.insertText = (text) => {
+      editor.focus();
+      const s = editor.selectionStart, e = editor.selectionEnd;
+      editor.value = editor.value.substring(0, s) + text + editor.value.substring(e);
+      editor.selectionStart = editor.selectionEnd = s + text.length;
+      editor.dispatchEvent(new Event('input'));
+    };
+
     updateLines();
-  </script>
+  <\/script>
 </body>
 </html>
 `;
 
-export default function CodeEditor({ content, language, onChange, readOnly }: Props) {
-  const webViewRef = useRef<WebView>(null);
+// Web version: use iframe
+function WebCodeEditor({ content, language, onChange, readOnly }: Props) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const loaded = useRef(false);
 
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'change') {
+          onChange(msg.content);
+        }
+      } catch {}
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onChange]);
+
+  // Patch the HTML to use parent.postMessage instead of ReactNativeWebView
+  const webHtml = EDITOR_HTML.replace(
+    /window\.ReactNativeWebView\.postMessage/g,
+    'window.parent.postMessage'
+  );
+
+  return (
+    <iframe
+      ref={iframeRef as any}
+      srcDoc={webHtml}
+      style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#0a0a0a' } as any}
+      onLoad={() => {
+        if (!loaded.current) {
+          loaded.current = true;
+          const escaped = JSON.stringify(content);
+          iframeRef.current?.contentWindow?.postMessage(
+            JSON.stringify({ type: 'setContent', text: escaped, readOnly: readOnly || false }),
+            '*',
+          );
+          // Direct eval as fallback
+          try {
+            (iframeRef.current?.contentWindow as any)?.setContent?.(content, readOnly || false);
+          } catch {}
+        }
+      }}
+    />
+  );
+}
+
+// Native version: use react-native-webview
+const NativeCodeEditor = forwardRef<CodeEditorRef, Props>(function NativeCodeEditor({ content, language, onChange, readOnly }, ref) {
+  const [WebViewModule, setWebViewModule] = useState<any>(null);
+  useEffect(() => {
+    import('react-native-webview').then((mod) => setWebViewModule(mod));
+  }, []);
+
+  const WebView = WebViewModule?.default;
+  const webViewRef = useRef<any>(null);
+  const loadedRef = useRef(false);
+
   const handleMessage = useCallback(
-    (event: WebViewMessageEvent) => {
+    (event: any) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data);
         if (msg.type === 'change') {
@@ -123,13 +193,27 @@ export default function CodeEditor({ content, language, onChange, readOnly }: Pr
     [onChange],
   );
 
+  useImperativeHandle(ref, () => ({
+    execCommand: (cmd: string) => {
+      webViewRef.current?.injectJavaScript(`window.execCommand('${cmd}'); true;`);
+    },
+    insertText: (text: string) => {
+      const escaped = JSON.stringify(text);
+      webViewRef.current?.injectJavaScript(`window.insertText(${escaped}); true;`);
+    },
+  }));
+
   const onLoad = useCallback(() => {
-    loaded.current = true;
+    loadedRef.current = true;
     const escaped = JSON.stringify(content);
     webViewRef.current?.injectJavaScript(
       `window.setContent(${escaped}, ${readOnly || false}); true;`
     );
   }, [content, readOnly]);
+
+  if (!WebView) {
+    return <View style={styles.editor}><Text style={{ color: '#888', padding: 20 }}>Laden...</Text></View>;
+  }
 
   return (
     <WebView
@@ -144,7 +228,14 @@ export default function CodeEditor({ content, language, onChange, readOnly }: Pr
       keyboardDisplayRequiresUserAction={false}
     />
   );
-}
+});
+
+const CodeEditor = forwardRef<CodeEditorRef, Props>(function CodeEditor(props, ref) {
+  if (Platform.OS === 'web') return <WebCodeEditor {...props} />;
+  return <NativeCodeEditor ref={ref} {...props} />;
+});
+
+export default CodeEditor;
 
 const styles = StyleSheet.create({
   editor: {

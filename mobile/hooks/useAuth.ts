@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem, deleteItem } from '../utils/storage';
 import { useStore } from '../store';
 
 const TOKEN_KEY = 'hussle_jwt';
@@ -10,8 +10,8 @@ export function useAuth() {
 
   const loadStored = useCallback(async () => {
     const [storedToken, storedUrl] = await Promise.all([
-      SecureStore.getItemAsync(TOKEN_KEY),
-      SecureStore.getItemAsync(URL_KEY),
+      getItem(TOKEN_KEY),
+      getItem(URL_KEY),
     ]);
     if (storedToken) setToken(storedToken);
     if (storedUrl) setServerUrl(storedUrl);
@@ -34,8 +34,8 @@ export function useAuth() {
 
       const { token: jwt } = await res.json();
       await Promise.all([
-        SecureStore.setItemAsync(TOKEN_KEY, jwt),
-        SecureStore.setItemAsync(URL_KEY, cleanUrl),
+        setItem(TOKEN_KEY, jwt),
+        setItem(URL_KEY, cleanUrl),
       ]);
       setToken(jwt);
       setServerUrl(cleanUrl);
@@ -46,8 +46,8 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(URL_KEY),
+      deleteItem(TOKEN_KEY),
+      deleteItem(URL_KEY),
     ]);
     setToken(null);
   }, [setToken]);

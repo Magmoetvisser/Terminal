@@ -81,10 +81,22 @@ export default function CostsScreen() {
         >
           {/* Total cost hero */}
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>Totale kosten</Text>
-            <Text style={[styles.heroCost, { color: accentColor }]}>
-              {formatCost(totalCost)}
-            </Text>
+            <View style={styles.heroRow}>
+              <View style={styles.heroBlock}>
+                <Text style={styles.heroLabel}>Huidige sessies</Text>
+                <Text style={[styles.heroCost, { color: accentColor }]}>
+                  {formatCost(totalCost)}
+                </Text>
+              </View>
+              {(stats?.lifetimeCost != null || stats?.totalCost != null) && (
+                <View style={[styles.heroBlock, styles.heroDivider]}>
+                  <Text style={styles.heroLabel}>Lifetime totaal</Text>
+                  <Text style={[styles.heroCost, { color: '#facc15' }]}>
+                    {formatCost(stats?.lifetimeCost ?? stats?.totalCost ?? 0)}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.heroSub}>live bijgewerkt</Text>
           </View>
 
@@ -171,9 +183,12 @@ const styles = StyleSheet.create({
     borderColor: '#2a2a2a',
     marginTop: 8,
   },
-  heroLabel: { color: '#888', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  heroCost: { fontSize: 42, fontWeight: '800', fontFamily: 'monospace', marginVertical: 8 },
-  heroSub: { color: '#555', fontSize: 11 },
+  heroRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around' },
+  heroBlock: { alignItems: 'center', flex: 1 },
+  heroDivider: { borderLeftWidth: 1, borderLeftColor: '#2a2a2a' },
+  heroLabel: { color: '#888', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  heroCost: { fontSize: 32, fontWeight: '800', fontFamily: 'monospace', marginVertical: 8 },
+  heroSub: { color: '#555', fontSize: 11, marginTop: 4 },
   sectionTitle: {
     color: '#888', fontSize: 12, fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 1,

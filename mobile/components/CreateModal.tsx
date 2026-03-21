@@ -6,13 +6,13 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { showAlert } from '../utils/alert';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApi } from '../hooks/useApi';
@@ -68,7 +68,7 @@ export default function CreateModal({ visible, onClose, onSessionCreated, onSend
       onSessionCreated?.(session);
       onClose();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export default function CreateModal({ visible, onClose, onSessionCreated, onSend
         router.push(`/editor/${encodeURIComponent(result.path)}` as any);
       }, 300);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showAlert('Error', err.message);
     } finally {
       setLoading(false);
     }

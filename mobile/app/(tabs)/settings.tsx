@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   PanResponder,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem } from '../../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store';
 
@@ -207,7 +207,7 @@ export default function SettingsScreen() {
   const slidingRef = useRef(false);
 
   useEffect(() => {
-    SecureStore.getItemAsync(ACCENT_KEY).then((stored) => {
+    getItem(ACCENT_KEY).then((stored) => {
       if (stored) setAccentColor(stored);
     });
   }, []);
@@ -224,7 +224,7 @@ export default function SettingsScreen() {
 
   const pickColor = async (color: string) => {
     setAccentColor(color);
-    await SecureStore.setItemAsync(ACCENT_KEY, color);
+    await setItem(ACCENT_KEY, color);
   };
 
   const onSlideStart = () => {

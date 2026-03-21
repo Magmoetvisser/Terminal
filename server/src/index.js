@@ -14,6 +14,16 @@ const path = require('path');
 
 const PORT = parseInt(process.env.PORT) || 3443;
 const app = express();
+
+// CORS — allow web client from any origin
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json());
 
 // --- Health check (no auth) ---
@@ -32,6 +42,47 @@ app.post('/auth', (req, res) => {
     return res.status(401).json({ error: 'Wrong password' });
   }
   res.json({ token });
+});
+
+// --- GitHub OAuth config (no auth — app needs client_id before login) ---
+app.get('/api/github/config', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) return res.status(404).json({ error: 'GitHub OAuth not configured' });
+  res.json({ client_id: clientId });
+});
+
+// --- GitHub OAuth token exchange (no auth — called during GitHub login) ---
+app.post('/api/github/exchange', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'code required' });
+
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return res.status(500).json({ error: 'GitHub OAuth not configured on server' });
+  }
+
+  try {
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+      }),
+    });
+    const data = await response.json();
+    if (data.error) {
+      return res.status(400).json({ error: data.error_description || data.error });
+    }
+    res.json({ access_token: data.access_token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- All other routes require auth ---

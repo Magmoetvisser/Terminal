@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Slot, usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+import { getItem } from '../../utils/storage';
 import { useStore } from '../../store';
 
 const ACCENT_KEY = 'hussle_accent_color';
@@ -28,6 +28,8 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   { route: '/(tabs)/terminal', title: 'Terminal', icon: 'terminal', section: 'Hoofd' },
   { route: '/(tabs)/agents', title: 'Agents', icon: 'people', section: 'Hoofd' },
+  { route: '/(tabs)/github', title: 'GitHub', icon: 'logo-github', section: 'Hoofd' },
+  { route: '/(tabs)/editor', title: 'Editor', icon: 'code-slash', section: 'Hoofd' },
   { route: '/(tabs)/logs', title: 'Logs', icon: 'document-text', section: 'Monitor' },
   { route: '/(tabs)/usage', title: 'Usage', icon: 'stats-chart', section: 'Monitor' },
   { route: '/(tabs)/costs', title: 'Kosten', icon: 'wallet', section: 'Monitor' },
@@ -43,7 +45,7 @@ export default function DrawerLayout() {
   const overlayAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    SecureStore.getItemAsync(ACCENT_KEY).then((stored) => {
+    getItem(ACCENT_KEY).then((stored) => {
       if (stored) setAccentColor(stored);
     });
   }, []);
