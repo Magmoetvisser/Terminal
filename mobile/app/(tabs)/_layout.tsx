@@ -1,94 +1,46 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Drawer } from 'expo-router/drawer';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Animated,
+  Dimensions,
+  SafeAreaView,
+} from 'react-native';
+import { Slot, usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { useStore } from '../../store';
-import { DrawerContentScrollView, DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
-import { useNavigation, DrawerActions } from '@react-navigation/native';
 
 const ACCENT_KEY = 'hussle_accent_color';
+const DRAWER_WIDTH = 260;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface MenuItem {
-  name: string;
+  route: string;
   title: string;
   icon: string;
   section?: string;
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { name: 'terminal', title: 'Terminal', icon: 'terminal', section: 'Hoofd' },
-  { name: 'agents', title: 'Agents', icon: 'people', section: 'Hoofd' },
-  { name: 'logs', title: 'Logs', icon: 'document-text', section: 'Monitor' },
-  { name: 'usage', title: 'Usage', icon: 'stats-chart', section: 'Monitor' },
-  { name: 'costs', title: 'Kosten', icon: 'wallet', section: 'Monitor' },
-  { name: 'settings', title: 'Instellingen', icon: 'settings-sharp', section: 'Overig' },
+  { route: '/(tabs)/terminal', title: 'Terminal', icon: 'terminal', section: 'Hoofd' },
+  { route: '/(tabs)/agents', title: 'Agents', icon: 'people', section: 'Hoofd' },
+  { route: '/(tabs)/logs', title: 'Logs', icon: 'document-text', section: 'Monitor' },
+  { route: '/(tabs)/usage', title: 'Usage', icon: 'stats-chart', section: 'Monitor' },
+  { route: '/(tabs)/costs', title: 'Kosten', icon: 'wallet', section: 'Monitor' },
+  { route: '/(tabs)/settings', title: 'Instellingen', icon: 'settings-sharp', section: 'Overig' },
 ];
-
-function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const { accentColor } = useStore();
-  const currentRoute = props.state.routes[props.state.index]?.name;
-
-  let lastSection = '';
-
-  return (
-    <DrawerContentScrollView {...props} style={styles.drawer} contentContainerStyle={styles.drawerContent}>
-      {/* Header */}
-      <View style={styles.drawerHeader}>
-        <View style={[styles.logoCircle, { backgroundColor: accentColor }]}>
-          <Ionicons name="terminal" size={20} color="#0a0a0a" />
-        </View>
-        <Text style={styles.drawerTitle}>Hussle Terminal</Text>
-      </View>
-
-      {/* Menu items */}
-      {MENU_ITEMS.map((item) => {
-        const isActive = currentRoute === item.name;
-        const showSection = item.section && item.section !== lastSection;
-        if (item.section) lastSection = item.section;
-
-        return (
-          <View key={item.name}>
-            {showSection && (
-              <Text style={styles.sectionLabel}>{item.section}</Text>
-            )}
-            <TouchableOpacity
-              style={[styles.menuItem, isActive && { backgroundColor: accentColor + '18' }]}
-              onPress={() => props.navigation.navigate(item.name)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={item.icon as any}
-                size={20}
-                color={isActive ? accentColor : '#888'}
-              />
-              <Text style={[styles.menuText, isActive && { color: accentColor, fontWeight: '700' }]}>
-                {item.title}
-              </Text>
-              {isActive && <View style={[styles.activeDot, { backgroundColor: accentColor }]} />}
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-    </DrawerContentScrollView>
-  );
-}
-
-function DrawerToggle() {
-  const navigation = useNavigation();
-  return (
-    <TouchableOpacity
-      style={{ marginLeft: 14 }}
-      onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Ionicons name="menu" size={24} color="#e0e0e0" />
-    </TouchableOpacity>
-  );
-}
 
 export default function DrawerLayout() {
   const { accentColor, setAccentColor } = useStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     SecureStore.getItemAsync(ACCENT_KEY).then((stored) => {
@@ -96,38 +48,193 @@ export default function DrawerLayout() {
     });
   }, []);
 
+  const toggleDrawer = () => {
+    if (drawerOpen) closeDrawer();
+    else openDrawer();
+  };
+
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: -DRAWER_WIDTH,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setDrawerOpen(false));
+  };
+
+  const navigateTo = (route: string) => {
+    router.push(route as any);
+    // Drawer stays open — no close
+  };
+
+  // Determine active route from pathname
+  const activeTab = pathname.split('/').pop() || 'terminal';
+
+  let lastSection = '';
+
   return (
-    <Drawer
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        drawerStyle: {
-          backgroundColor: '#0a0a0a',
-          width: 260,
-        },
-        headerStyle: { backgroundColor: '#0a0a0a' },
-        headerTintColor: '#e0e0e0',
-        headerTitleStyle: { fontWeight: '600' },
-        swipeEnabled: true,
-        swipeEdgeWidth: 50,
-        headerLeft: () => <DrawerToggle />,
-      }}
-    >
-      <Drawer.Screen name="terminal" options={{ title: 'Terminal' }} />
-      <Drawer.Screen name="agents" options={{ title: 'Agents' }} />
-      <Drawer.Screen name="logs" options={{ title: 'Logs' }} />
-      <Drawer.Screen name="usage" options={{ title: 'Usage' }} />
-      <Drawer.Screen name="costs" options={{ title: 'Kosten' }} />
-      <Drawer.Screen name="settings" options={{ title: 'Instellingen' }} />
-    </Drawer>
+    <View style={styles.container}>
+      {/* Header */}
+      <SafeAreaView style={styles.headerSafe}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={toggleDrawer}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="menu" size={24} color="#e0e0e0" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {MENU_ITEMS.find(m => m.route.endsWith(activeTab))?.title || 'Hussle'}
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+      </SafeAreaView>
+
+      {/* Content */}
+      <View style={styles.content}>
+        <Slot />
+      </View>
+
+      {/* Overlay — tap to close */}
+      {drawerOpen && (
+        <TouchableWithoutFeedback onPress={closeDrawer}>
+          <Animated.View
+            style={[
+              styles.overlay,
+              { opacity: overlayAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) },
+            ]}
+          />
+        </TouchableWithoutFeedback>
+      )}
+
+      {/* Drawer */}
+      <Animated.View
+        style={[
+          styles.drawer,
+          { transform: [{ translateX: slideAnim }] },
+        ]}
+      >
+        <SafeAreaView style={styles.drawerSafe}>
+          {/* Drawer header */}
+          <View style={styles.drawerHeader}>
+            <View style={[styles.logoCircle, { backgroundColor: accentColor }]}>
+              <Ionicons name="terminal" size={20} color="#0a0a0a" />
+            </View>
+            <Text style={styles.drawerTitle}>Hussle</Text>
+          </View>
+
+          {/* Menu items */}
+          {MENU_ITEMS.map((item) => {
+            const tabName = item.route.split('/').pop() || '';
+            const isActive = activeTab === tabName;
+            const showSection = item.section && item.section !== lastSection;
+            if (item.section) lastSection = item.section;
+
+            return (
+              <View key={item.route}>
+                {showSection && (
+                  <Text style={styles.sectionLabel}>{item.section}</Text>
+                )}
+                <TouchableOpacity
+                  style={[styles.menuItem, isActive && { backgroundColor: accentColor + '18' }]}
+                  onPress={() => navigateTo(item.route)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={20}
+                    color={isActive ? accentColor : '#888'}
+                  />
+                  <Text style={[styles.menuText, isActive && { color: accentColor, fontWeight: '700' }]}>
+                    {item.title}
+                  </Text>
+                  {isActive && <View style={[styles.activeDot, { backgroundColor: accentColor }]} />}
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </SafeAreaView>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  drawer: {
+  container: {
+    flex: 1,
     backgroundColor: '#0a0a0a',
   },
-  drawerContent: {
-    paddingTop: 0,
+  headerSafe: {
+    backgroundColor: '#0a0a0a',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  headerTitle: {
+    color: '#e0e0e0',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+    zIndex: 10,
+  },
+  drawer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: '#0a0a0a',
+    borderRightWidth: 1,
+    borderRightColor: '#1a1a1a',
+    zIndex: 20,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+  },
+  drawerSafe: {
+    flex: 1,
   },
   drawerHeader: {
     flexDirection: 'row',
