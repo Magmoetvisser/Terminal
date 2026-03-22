@@ -345,6 +345,8 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
     setShowScrollBtn(false);
   }, []);
 
+  const SENTINEL = ' ';
+  const [inputValue, setInputValue] = useState(SENTINEL);
   const prevInputText = useRef('');
   const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
@@ -475,10 +477,17 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         keyboardAppearance="dark"
         blurOnSubmit={false}
         returnKeyType="send"
-        value=""
+        value={inputValue}
+        selection={{ start: 1, end: 1 }}
         onChangeText={(text) => {
           stopBackspace();
-          if (text && sessionId) sendInput(sessionId, text);
+          if (text.length > SENTINEL.length) {
+            const typed = text.slice(SENTINEL.length);
+            if (sessionId) sendInput(sessionId, typed);
+          } else if (text.length < SENTINEL.length) {
+            if (sessionId) sendInput(sessionId, '\x7f');
+          }
+          setInputValue(SENTINEL);
         }}
         onKeyPress={({ nativeEvent }) => {
           if (nativeEvent.key === 'Backspace') startBackspace();
@@ -486,6 +495,7 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         onSubmitEditing={() => {
           stopBackspace();
           if (sessionId) sendInput(sessionId, '\r');
+          setInputValue(SENTINEL);
         }}
       />
 

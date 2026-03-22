@@ -13,7 +13,10 @@
       "Bash(curl -s http://localhost:3000/api/agents/0aa4dc6e-c6b5-4203-8e3d-27d7b6a7b925/messages)",
       "Bash(curl -s http://localhost:3000/api/stats)",
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
-      "Bash(curl -s http://localhost:3000/api/sessions)"
+      "Bash(curl -s http://localhost:3000/api/sessions)",
+      "Bash(pkill -f \"serve dist\")",
+      "Bash(netsh advfirewall:*)",
+      "Bash(rtk git:*)"
     ]
   }
 }

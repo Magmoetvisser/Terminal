@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Keyboard, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState, Keyboard, ScrollView, TextInput } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -18,22 +18,14 @@ const XTERM_HTML = `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
-    #wrap { position: relative; width: 100%; height: 100%; }
     #terminal { width: 100%; height: 100%; }
     .xterm { padding: 4px; }
     .xterm-viewport { overflow: hidden !important; }
     .xterm-helper-textarea { display: none !important; }
-    #overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 100; touch-action: none;
-    }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <div id="terminal"></div>
-    <div id="overlay"></div>
-  </div>
+  <div id="terminal"></div>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
   <script>
@@ -85,87 +77,11 @@ const XTERM_HTML = `
       }
     });
 
-    // --- Touch overlay for scrolling ---
-    const overlay = document.getElementById('overlay');
-    const LINE_HEIGHT = 17;
-    const FRICTION = 0.93;
-    const MIN_VEL = 0.2;
-    const TAP_THRESHOLD = 10;
+    // Scroll by N lines (called from React Native)
+    window.scrollLines = (n) => { try { term.scrollLines(n); } catch(e) {} };
+    window.focusTerm = () => { try { term.focus(); } catch(e) {} };
 
-    let startY, startX, lastY, lastTime, isSwiping, momentumId;
-    let velocityY = 0, scrollAcc = 0;
-    let samples = [];
-
-    function stopMomentum() {
-      if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; }
-      velocityY = 0; scrollAcc = 0; samples = [];
-    }
-
-    function scrollPx(px) {
-      scrollAcc += px / LINE_HEIGHT;
-      const lines = Math.trunc(scrollAcc);
-      if (lines !== 0) { term.scrollLines(lines); scrollAcc -= lines; }
-    }
-
-    function glide() {
-      if (Math.abs(velocityY) < MIN_VEL) { momentumId = null; scrollAcc = 0; return; }
-      scrollPx(velocityY);
-      velocityY *= FRICTION;
-      momentumId = requestAnimationFrame(glide);
-    }
-
-    overlay.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      stopMomentum();
-      const t = e.touches[0];
-      startY = lastY = t.clientY;
-      startX = t.clientX;
-      lastTime = performance.now();
-      isSwiping = false;
-    });
-
-    overlay.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      const t = e.touches[0];
-      const now = performance.now();
-      const dy = lastY - t.clientY;
-      const dt = now - lastTime;
-
-      if (!isSwiping) {
-        if (Math.abs(t.clientY - startY) > TAP_THRESHOLD || Math.abs(t.clientX - startX) > TAP_THRESHOLD) {
-          isSwiping = true;
-        }
-      }
-
-      if (isSwiping && dt > 0) {
-        scrollPx(dy);
-        samples.push({ v: dy / dt, t: now });
-        while (samples.length > 0 && now - samples[0].t > 100) samples.shift();
-      }
-
-      lastY = t.clientY;
-      lastTime = now;
-    });
-
-    overlay.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      if (!isSwiping) {
-        // Tap — tell React Native to focus hidden input
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'focusInput' }));
-        return;
-      }
-      if (samples.length >= 2) {
-        let sum = 0;
-        for (const s of samples) sum += s.v;
-        velocityY = (sum / samples.length) * 16;
-        if (Math.abs(velocityY) > MIN_VEL) {
-          momentumId = requestAnimationFrame(glide);
-        }
-      }
-      samples = [];
-    });
-
-    // Terminal I/O — xterm keyboard disabled, input comes from React Native
+    // Terminal I/O
     term.onData((data) => {
       try {
         if (isAtBottom) {
@@ -248,6 +164,8 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
     setShowScrollBtn(false);
   }, []);
 
+  const SENTINEL = ' ';
+  const [inputValue, setInputValue] = useState(SENTINEL);
   const prevInputText = useRef('');
   const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
@@ -368,10 +286,17 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
         keyboardAppearance="dark"
         blurOnSubmit={false}
         returnKeyType="send"
-        value=""
+        value={inputValue}
+        selection={{ start: 1, end: 1 }}
         onChangeText={(text) => {
           stopBackspace();
-          if (text) onInput(text);
+          if (text.length > SENTINEL.length) {
+            const typed = text.slice(SENTINEL.length);
+            onInput(typed);
+          } else if (text.length < SENTINEL.length) {
+            onInput('\x7f');
+          }
+          setInputValue(SENTINEL);
         }}
         onKeyPress={({ nativeEvent }) => {
           if (nativeEvent.key === 'Backspace') startBackspace();
@@ -379,6 +304,7 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
         onSubmitEditing={() => {
           stopBackspace();
           onInput('\r');
+          setInputValue(SENTINEL);
         }}
       />
 
