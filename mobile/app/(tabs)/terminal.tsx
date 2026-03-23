@@ -6,6 +6,7 @@ import CreateModal from '../../components/CreateModal';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useApi } from '../../hooks/useApi';
 import { useStore, TerminalSession } from '../../store';
+import { colors, spacing, radius, fontSize } from '../../constants/theme';
 
 export default function TerminalScreen() {
   const { sessions, activeSessionId, setSessions, setActiveSessionId, addSession, removeSession } = useStore();
@@ -37,7 +38,8 @@ export default function TerminalScreen() {
     apiFetch('/api/sessions')
       .then((data: TerminalSession[]) => {
         setSessions(data);
-        if (data.length > 0 && !activeSessionId) {
+        const currentActive = useStore.getState().activeSessionId;
+        if (data.length > 0 && !currentActive) {
           setActiveSessionId(data[0].id);
         }
       })
@@ -66,16 +68,12 @@ export default function TerminalScreen() {
       {
         text: 'Beëindigen', style: 'destructive',
         onPress: async () => {
-          try {
-            await apiFetch(`/api/sessions/${id}`, { method: 'DELETE' });
-            removeSession(id);
-            if (activeSessionId === id) {
-              const remaining = sessions.filter(s => s.id !== id);
-              setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
-            }
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          removeSession(id);
+          if (activeSessionId === id) {
+            const remaining = sessions.filter(s => s.id !== id);
+            setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
           }
+          apiFetch(`/api/sessions/${id}`, { method: 'DELETE' }).catch(() => {});
         },
       },
     ]);
@@ -89,15 +87,15 @@ export default function TerminalScreen() {
       {/* Top bar with session info */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.sessionSelector} onPress={() => setShowSessions(!showSessions)}>
-          <View style={[styles.dot, { backgroundColor: activeSession?.active ? '#4ade80' : '#555' }]} />
+          <View style={[styles.dot, { backgroundColor: activeSession?.active ? colors.accent : colors.textDim }]} />
           <Text style={styles.sessionName} numberOfLines={1}>
             {activeSession?.title || 'Geen sessie'}
           </Text>
           <Text style={styles.sessionCount}>{activeSessions.length}</Text>
-          <Ionicons name={showSessions ? 'chevron-up' : 'chevron-down'} size={16} color="#888" />
+          <Ionicons name={showSessions ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
-          <Ionicons name="add" size={22} color="#4ade80" />
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="add" size={22} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -112,14 +110,14 @@ export default function TerminalScreen() {
                 style={[styles.sessionRow, item.id === activeSessionId && styles.sessionRowActive]}
                 onPress={() => { setActiveSessionId(item.id); setShowSessions(false); }}
               >
-                <View style={[styles.dot, { backgroundColor: item.active ? '#4ade80' : '#555' }]} />
+                <View style={[styles.dot, { backgroundColor: item.active ? colors.accent : colors.textDim }]} />
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionTitle}>{item.title}</Text>
                   <Text style={styles.sessionPath} numberOfLines={1}>{item.workdir}</Text>
                 </View>
                 {item.active && (
                   <TouchableOpacity onPress={() => killSession(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <Ionicons name="close-circle" size={18} color="#f87171" />
+                    <Ionicons name="close-circle" size={18} color={colors.red} />
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
@@ -129,7 +127,7 @@ export default function TerminalScreen() {
             }
             ListFooterComponent={
               <TouchableOpacity style={styles.newSessionBtn} onPress={() => { setShowSessions(false); setShowCreate(true); }}>
-                <Ionicons name="add-circle" size={16} color="#4ade80" />
+                <Ionicons name="add-circle" size={16} color={colors.accent} />
                 <Text style={styles.newSessionText}>Nieuwe sessie</Text>
               </TouchableOpacity>
             }
@@ -142,7 +140,7 @@ export default function TerminalScreen() {
         <TerminalWebView onInput={handleInput} onResize={handleResize} />
       ) : (
         <View style={styles.empty}>
-          <Ionicons name="terminal" size={48} color="#333" />
+          <Ionicons name="terminal" size={48} color={colors.textDim} />
           <Text style={styles.emptyText}>Geen actieve sessie</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowCreate(true)}>
             <Text style={styles.emptyBtnText}>Nieuwe sessie starten</Text>
@@ -164,42 +162,42 @@ export default function TerminalScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: colors.bg },
   topBar: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   sessionSelector: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1a1a1a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: colors.elevated, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
-  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  sessionName: { color: '#e0e0e0', fontSize: 14, flex: 1, marginRight: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.sm },
+  sessionName: { color: colors.text, fontSize: fontSize.standard, flex: 1, marginRight: spacing.sm },
   sessionCount: {
-    color: '#4ade80', fontSize: 11, fontWeight: '700',
+    color: colors.accent, fontSize: fontSize.micro, fontWeight: '700',
     backgroundColor: '#1a2a1a', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, marginRight: 6,
   },
-  addBtn: { marginLeft: 10, padding: 6 },
+  addBtn: { marginLeft: spacing.md, padding: spacing.sm },
   sessionPanel: {
-    backgroundColor: '#111', borderBottomWidth: 1, borderBottomColor: '#1a1a1a', maxHeight: 250,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, maxHeight: 250,
   },
   sessionRow: {
-    flexDirection: 'row', alignItems: 'center', padding: 12,
-    borderBottomWidth: 1, borderBottomColor: '#141414',
+    flexDirection: 'row', alignItems: 'center', padding: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   sessionRowActive: { backgroundColor: '#0a1a0a' },
-  sessionInfo: { flex: 1, marginLeft: 4 },
-  sessionTitle: { color: '#e0e0e0', fontSize: 14, fontWeight: '600' },
-  sessionPath: { color: '#555', fontSize: 11, fontFamily: 'monospace', marginTop: 2 },
-  noSessions: { color: '#555', textAlign: 'center', padding: 16 },
+  sessionInfo: { flex: 1, marginLeft: spacing.xs },
+  sessionTitle: { color: colors.text, fontSize: fontSize.standard, fontWeight: '600' },
+  sessionPath: { color: colors.textDim, fontSize: fontSize.micro, fontFamily: 'monospace', marginTop: 2 },
+  noSessions: { color: colors.textDim, textAlign: 'center', padding: spacing.lg },
   newSessionBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    padding: 12, borderTopWidth: 1, borderTopColor: '#1a1a1a',
+    padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border,
   },
-  newSessionText: { color: '#4ade80', fontSize: 13, fontWeight: '600', marginLeft: 6 },
+  newSessionText: { color: colors.accent, fontSize: fontSize.standard, fontWeight: '600', marginLeft: 6 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#555', fontSize: 16, marginTop: 12, marginBottom: 20 },
-  emptyBtn: { backgroundColor: '#4ade80', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 12 },
-  emptyBtnText: { color: '#0a0a0a', fontWeight: '700' },
+  emptyText: { color: colors.textDim, fontSize: fontSize.body, marginTop: spacing.md, marginBottom: spacing.xl },
+  emptyBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
+  emptyBtnText: { color: colors.bg, fontWeight: '700', fontSize: fontSize.body },
 });

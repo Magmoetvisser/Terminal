@@ -12,14 +12,20 @@ export function useApi() {
       const url = `${serverUrl}${path}`;
       console.log(`[API] ${options?.method || 'GET'} ${url}`);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(url, {
         ...options,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
           ...(options?.headers || {}),
         },
       });
+
+      clearTimeout(timeoutId);
 
       const text = await res.text();
       let data;

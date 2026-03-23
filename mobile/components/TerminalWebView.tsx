@@ -104,6 +104,10 @@ const XTERM_HTML = `
     window.clearTerminal = () => { try { term.clear(); } catch(e) {} };
     window.scrollToBottom = () => { try { term.scrollToBottom(); isAtBottom = true; window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scrollState', atBottom: true })); } catch(e) {} };
 
+    document.addEventListener('click', () => {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'focusInput' }));
+    });
+
     } catch(e) {
       document.body.innerText = 'Terminal error: ' + e.message;
     }
@@ -166,7 +170,6 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
 
   const SENTINEL = ' ';
   const [inputValue, setInputValue] = useState(SENTINEL);
-  const prevInputText = useRef('');
   const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
 
@@ -210,104 +213,6 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
 
   return (
     <View style={[styles.wrapper, { marginBottom: keyboardHeight }]}>
-      {/* Shortcut toolbar */}
-      <View style={styles.toolbar}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.toolbarContent}
-        keyboardShouldPersistTaps="always"
-        nestedScrollEnabled
-        onScrollBeginDrag={() => { toolbarScrolling.current = true; }}
-        onScrollEndDrag={() => {
-          Keyboard.dismiss();
-          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
-          setTimeout(() => { toolbarScrolling.current = false; }, 200);
-        }}
-        onMomentumScrollEnd={() => {
-          Keyboard.dismiss();
-          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
-          toolbarScrolling.current = false;
-        }}
-      >
-        <TouchableOpacity style={[styles.toolbarBtn, styles.enterBtn]} onPress={() => sendKey('\r')} activeOpacity={0.6}>
-          <Ionicons name="return-down-back" size={14} color="#4ade80" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>ESC</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.toolbarBtn, styles.ctrlCBtn]} onPress={() => sendKey('\x03')} activeOpacity={0.6}>
-          <Text style={styles.ctrlCBtnText}>Ctrl+C</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\t')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>TAB</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[Z')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>⇧TAB</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x04')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>Ctrl+D</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1a')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>Ctrl+Z</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x01')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>Ctrl+A</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x18')} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>Ctrl+X</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={pasteFromClipboard} activeOpacity={0.6}>
-          <Text style={styles.toolbarBtnText}>Plak</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[A')} activeOpacity={0.6}>
-          <Ionicons name="arrow-up" size={14} color="#aaa" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[B')} activeOpacity={0.6}>
-          <Ionicons name="arrow-down" size={14} color="#aaa" />
-        </TouchableOpacity>
-      </ScrollView>
-        <TouchableOpacity
-          style={styles.dismissBtn}
-          onPress={() => { Keyboard.dismiss(); inputRef.current?.blur(); }}
-          activeOpacity={0.6}
-        >
-          <Ionicons name="chevron-down-outline" size={16} color="#888" />
-        </TouchableOpacity>
-      </View>
-
-      <TextInput
-        ref={inputRef}
-        style={styles.hiddenInput}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        spellCheck={false}
-        keyboardAppearance="dark"
-        blurOnSubmit={false}
-        returnKeyType="send"
-        value={inputValue}
-        selection={{ start: 1, end: 1 }}
-        onChangeText={(text) => {
-          stopBackspace();
-          if (text.length > SENTINEL.length) {
-            const typed = text.slice(SENTINEL.length);
-            onInput(typed);
-          } else if (text.length < SENTINEL.length) {
-            onInput('\x7f');
-          }
-          setInputValue(SENTINEL);
-        }}
-        onKeyPress={({ nativeEvent }) => {
-          if (nativeEvent.key === 'Backspace') startBackspace();
-        }}
-        onSubmitEditing={() => {
-          stopBackspace();
-          onInput('\r');
-          setInputValue(SENTINEL);
-        }}
-      />
-
       <WebView
         ref={webViewRef}
         source={{ html: XTERM_HTML }}
@@ -334,6 +239,105 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           <Ionicons name="arrow-down" size={22} color="#0a0a0a" />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Shortcut toolbar */}
+      <View style={styles.toolbar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.toolbarContent}
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled
+          onScrollBeginDrag={() => { toolbarScrolling.current = true; }}
+          onScrollEndDrag={() => {
+            Keyboard.dismiss();
+            webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
+            setTimeout(() => { toolbarScrolling.current = false; }, 200);
+          }}
+          onMomentumScrollEnd={() => {
+            Keyboard.dismiss();
+            webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
+            toolbarScrolling.current = false;
+          }}
+        >
+          <TouchableOpacity style={[styles.toolbarBtn, styles.enterBtn]} onPress={() => sendKey('\r')} activeOpacity={0.6}>
+            <Ionicons name="return-down-back" size={14} color="#4ade80" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>ESC</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.toolbarBtn, styles.ctrlCBtn]} onPress={() => sendKey('\x03')} activeOpacity={0.6}>
+            <Text style={styles.ctrlCBtnText}>Ctrl+C</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\t')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>TAB</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[Z')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>⇧TAB</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x04')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>Ctrl+D</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1a')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>Ctrl+Z</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x01')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>Ctrl+A</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x18')} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>Ctrl+X</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={pasteFromClipboard} activeOpacity={0.6}>
+            <Text style={styles.toolbarBtnText}>Plak</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[A')} activeOpacity={0.6}>
+            <Ionicons name="arrow-up" size={14} color="#aaa" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[B')} activeOpacity={0.6}>
+            <Ionicons name="arrow-down" size={14} color="#aaa" />
+          </TouchableOpacity>
+        </ScrollView>
+        <TouchableOpacity
+          style={styles.dismissBtn}
+          onPress={() => { Keyboard.dismiss(); inputRef.current?.blur(); }}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chevron-down-outline" size={16} color="#888" />
+        </TouchableOpacity>
+      </View>
+
+      <TextInput
+        ref={inputRef}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        spellCheck={false}
+        keyboardAppearance="dark"
+        blurOnSubmit={false}
+        returnKeyType="send"
+        value={inputValue}
+        selection={{ start: 1, end: 1 }}
+        caretHidden
+        style={styles.hiddenInput}
+        onChangeText={(text) => {
+          stopBackspace();
+          if (text.length > SENTINEL.length) {
+            const typed = text.slice(SENTINEL.length);
+            onInput(typed);
+          } else if (text.length < SENTINEL.length) {
+            onInput('\x7f');
+          }
+          setInputValue(SENTINEL);
+        }}
+        onKeyPress={({ nativeEvent }) => {
+          if (nativeEvent.key === 'Backspace') startBackspace();
+        }}
+        onSubmitEditing={() => {
+          stopBackspace();
+          onInput('\r');
+          setInputValue(SENTINEL);
+        }}
+      />
     </View>
   );
 }
@@ -347,15 +351,6 @@ TerminalWebView.clear = () => {
 };
 
 const styles = StyleSheet.create({
-  hiddenInput: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 1,
-    height: 1,
-    opacity: 0,
-    zIndex: -1,
-  },
   wrapper: {
     flex: 1,
     position: 'relative',
@@ -364,8 +359,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#111',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a1a',
   },
   dismissBtn: {
     paddingHorizontal: 10,
@@ -427,5 +422,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 6,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
 });

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useApi } from '../../hooks/useApi';
 import { useStore, TerminalSession } from '../../store';
+import { colors, spacing, radius, fontSize } from '../../constants/theme';
 
 export default function LogsScreen() {
   const { apiFetch } = useApi();
@@ -37,19 +38,16 @@ export default function LogsScreen() {
     [apiFetch],
   );
 
-  // Auto-select first session
   useEffect(() => {
     if (!selectedSession && sessions.length > 0) {
       setSelectedSession(sessions[0].id);
     }
   }, [sessions]);
 
-  // Fetch logs when session changes
   useEffect(() => {
     if (selectedSession) fetchLogs(selectedSession);
   }, [selectedSession, fetchLogs]);
 
-  // Auto-refresh elke 3 sec
   useEffect(() => {
     if (!selectedSession) return;
     const interval = setInterval(() => fetchLogs(selectedSession), 3000);
@@ -63,7 +61,6 @@ export default function LogsScreen() {
     setRefreshing(false);
   };
 
-  // Split log in regels en filter op zoekterm
   const logLines = logData
     .split('\n')
     .filter((line) => !search || line.toLowerCase().includes(search.toLowerCase()));
@@ -85,7 +82,7 @@ export default function LogsScreen() {
               style={[styles.chip, item.id === selectedSession && styles.chipActive]}
               onPress={() => setSelectedSession(item.id)}
             >
-              <View style={[styles.chipDot, { backgroundColor: item.active ? '#4ade80' : '#555' }]} />
+              <View style={[styles.chipDot, { backgroundColor: item.active ? colors.accent : colors.textDim }]} />
               <Text style={[styles.chipText, item.id === selectedSession && styles.chipTextActive]}>
                 {item.title}
               </Text>
@@ -98,7 +95,7 @@ export default function LogsScreen() {
       {/* Session info */}
       {selectedInfo && (
         <View style={styles.infoBar}>
-          <Ionicons name="terminal" size={14} color="#4ade80" />
+          <Ionicons name="terminal" size={14} color={colors.accent} />
           <Text style={styles.infoText} numberOfLines={1}>{selectedInfo.workdir}</Text>
           <Text style={styles.infoStatus}>{selectedInfo.active ? 'Actief' : 'Gestopt'}</Text>
         </View>
@@ -106,33 +103,33 @@ export default function LogsScreen() {
 
       {/* Search bar */}
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={16} color="#555" style={{ marginRight: 8 }} />
+        <Ionicons name="search" size={16} color={colors.textDim} style={{ marginRight: spacing.sm }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Zoeken in logs..."
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textDim}
           value={search}
           onChangeText={setSearch}
           autoCapitalize="none"
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color="#555" />
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close-circle" size={18} color={colors.textDim} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Log output */}
       {loading && !logData ? (
-        <ActivityIndicator color="#4ade80" style={{ padding: 40 }} />
+        <ActivityIndicator color={colors.accent} style={{ padding: 40 }} />
       ) : !selectedSession ? (
         <View style={styles.empty}>
-          <Ionicons name="document-text-outline" size={48} color="#333" />
+          <Ionicons name="document-text-outline" size={48} color={colors.textDim} />
           <Text style={styles.emptyText}>Selecteer een sessie om logs te bekijken</Text>
         </View>
       ) : logLines.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="document-text-outline" size={48} color="#333" />
+          <Ionicons name="document-text-outline" size={48} color={colors.textDim} />
           <Text style={styles.emptyText}>
             {search ? 'Geen resultaten gevonden' : 'Nog geen output in deze sessie'}
           </Text>
@@ -147,7 +144,7 @@ export default function LogsScreen() {
               <Text style={styles.lineText} selectable>{item}</Text>
             </View>
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4ade80" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
           initialNumToRender={50}
           inverted={false}
         />
@@ -157,47 +154,47 @@ export default function LogsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: colors.bg },
   sessionBar: {
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
+    paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   sectionLabel: {
-    color: '#555', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8,
+    color: colors.textDim, fontSize: fontSize.micro, fontWeight: '700', letterSpacing: 1.5, marginBottom: spacing.sm,
   },
   chip: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1a1a1a', borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 7, marginRight: 8,
-    borderWidth: 1, borderColor: '#2a2a2a',
+    backgroundColor: colors.elevated, borderRadius: radius.sm,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginRight: spacing.sm,
+    borderWidth: 1, borderColor: colors.borderStrong,
   },
-  chipActive: { backgroundColor: '#4ade80', borderColor: '#4ade80' },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  chipText: { color: '#aaa', fontSize: 12 },
-  chipTextActive: { color: '#0a0a0a', fontWeight: '600' },
-  noSessions: { color: '#555', fontSize: 13 },
+  chipText: { color: colors.textSecondary, fontSize: fontSize.caption },
+  chipTextActive: { color: colors.bg, fontWeight: '600' },
+  noSessions: { color: colors.textDim, fontSize: fontSize.standard },
   infoBar: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: '#0f0f0f', borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  infoText: { color: '#666', fontSize: 11, fontFamily: 'monospace', flex: 1, marginLeft: 6 },
-  infoStatus: { color: '#4ade80', fontSize: 10, fontWeight: '600' },
+  infoText: { color: colors.textMuted, fontSize: fontSize.micro, fontFamily: 'monospace', flex: 1, marginLeft: 6 },
+  infoStatus: { color: colors.accent, fontSize: fontSize.micro, fontWeight: '600' },
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1a1a1a', margin: 12, marginBottom: 4,
-    borderRadius: 10, paddingHorizontal: 12,
-    borderWidth: 1, borderColor: '#2a2a2a',
+    backgroundColor: colors.elevated, margin: spacing.md, marginBottom: spacing.xs,
+    borderRadius: radius.md, paddingHorizontal: spacing.md,
+    borderWidth: 1, borderColor: colors.borderStrong,
   },
-  searchInput: { flex: 1, color: '#e0e0e0', fontSize: 14, paddingVertical: 10 },
+  searchInput: { flex: 1, color: colors.text, fontSize: fontSize.standard, paddingVertical: 10 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyText: { color: '#555', marginTop: 12, textAlign: 'center' },
+  emptyText: { color: colors.textDim, marginTop: spacing.md, textAlign: 'center', fontSize: fontSize.standard },
   logLine: {
-    flexDirection: 'row', paddingVertical: 1, paddingHorizontal: 4,
+    flexDirection: 'row', paddingVertical: 1, paddingHorizontal: spacing.xs,
   },
   lineNum: {
-    color: '#333', fontSize: 11, fontFamily: 'monospace',
-    width: 36, textAlign: 'right', marginRight: 8,
+    color: colors.textDim, fontSize: fontSize.micro, fontFamily: 'monospace',
+    width: 36, textAlign: 'right', marginRight: spacing.sm,
   },
-  lineText: { color: '#ccc', fontSize: 12, fontFamily: 'monospace', flex: 1, lineHeight: 18 },
+  lineText: { color: colors.textSecondary, fontSize: fontSize.caption, fontFamily: 'monospace', flex: 1, lineHeight: 18 },
 });

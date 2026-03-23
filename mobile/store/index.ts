@@ -51,7 +51,8 @@ interface AppState {
   systemInfo: SystemInfo | null;
   accentColor: string;
   githubToken: string | null;
-  pendingTerminalInput: string | null;
+  agentSessionMap: Record<string, string>; // agentId -> sessionId
+  terminalFontSize: number;
 
   setServerUrl: (url: string) => void;
   setToken: (token: string | null) => void;
@@ -63,7 +64,8 @@ interface AppState {
   setSystemInfo: (info: SystemInfo) => void;
   setAccentColor: (color: string) => void;
   setGithubToken: (token: string | null) => void;
-  setPendingTerminalInput: (input: string | null) => void;
+  setAgentSession: (agentId: string, sessionId: string) => void;
+  setTerminalFontSize: (size: number) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -75,7 +77,8 @@ export const useStore = create<AppState>((set) => ({
   systemInfo: null,
   accentColor: '#4ade80',
   githubToken: null,
-  pendingTerminalInput: null,
+  agentSessionMap: {},
+  terminalFontSize: 14,
 
   setServerUrl: (url) => set({ serverUrl: url }),
   setToken: (token) => set({ token }),
@@ -92,5 +95,11 @@ export const useStore = create<AppState>((set) => ({
   setSystemInfo: (info) => set({ systemInfo: info }),
   setAccentColor: (color) => set({ accentColor: color }),
   setGithubToken: (token) => set({ githubToken: token }),
-  setPendingTerminalInput: (input) => set({ pendingTerminalInput: input }),
+  setAgentSession: (agentId, sessionId) =>
+    set((state) => ({ agentSessionMap: { ...state.agentSessionMap, [agentId]: sessionId } })),
+  setTerminalFontSize: (size) => set({ terminalFontSize: size }),
 }));
+
+export function getAgentSession(agentId: string): string | null {
+  return useStore.getState().agentSessionMap[agentId] || null;
+}

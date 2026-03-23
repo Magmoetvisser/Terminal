@@ -2,16 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Agent } from '../store';
-
-const STATUS_COLORS: Record<string, string> = {
-  working: '#4ade80',
-  thinking: '#facc15',
-  waiting: '#60a5fa',
-  idle: '#6b7280',
-  done: '#6b7280',
-  error: '#f87171',
-  help: '#c084fc',
-};
+import { colors, spacing, radius, fontSize } from '../constants/theme';
+import { formatDuration, formatTokens } from '../utils/formatters';
 
 const STATUS_ICONS: Record<string, string> = {
   working: 'build',
@@ -33,24 +25,6 @@ interface Props {
   agent: Agent;
 }
 
-function formatDuration(ms: number) {
-  if (!ms) return '0s';
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remainSecs = secs % 60;
-  if (mins < 60) return `${mins}m ${remainSecs}s`;
-  const hours = Math.floor(mins / 60);
-  return `${hours}h ${mins % 60}m`;
-}
-
-function formatTokens(n: number) {
-  if (!n) return '0';
-  if (n < 1000) return String(n);
-  if (n < 1000000) return `${(n / 1000).toFixed(1)}K`;
-  return `${(n / 1000000).toFixed(2)}M`;
-}
-
 function getModelShort(model: string | undefined) {
   if (!model) return null;
   if (model.includes('opus')) return 'opus';
@@ -61,7 +35,7 @@ function getModelShort(model: string | undefined) {
 
 export default function AgentCard({ agent }: Props) {
   const status = (agent.status || 'idle').toLowerCase();
-  const statusColor = STATUS_COLORS[status] || '#6b7280';
+  const statusColor = colors.status[status] || colors.gray;
   const statusIcon = STATUS_ICONS[status] || 'ellipse';
   const isActive = agent.timing?.active === true;
   const totalTokens = (agent.tokenUsage?.inputTokens || 0) + (agent.tokenUsage?.outputTokens || 0);
@@ -69,7 +43,7 @@ export default function AgentCard({ agent }: Props) {
   const projectPath = agent.metadata?.projectPath || agent.project || '';
   const projectName = projectPath.split(/[\\/]/).pop() || agent.name || 'Unknown';
   const modelShort = getModelShort(agent.model);
-  const modelColor = modelShort ? MODEL_COLORS[modelShort] : '#888';
+  const modelColor = modelShort ? MODEL_COLORS[modelShort] : colors.textMuted;
 
   return (
     <View style={[styles.card, { borderLeftColor: statusColor, borderLeftWidth: 3 }]}>
@@ -103,7 +77,7 @@ export default function AgentCard({ agent }: Props) {
 
       {/* Project */}
       <View style={styles.projectRow}>
-        <Ionicons name="folder" size={13} color="#facc15" />
+        <Ionicons name="folder" size={13} color={colors.yellow} />
         <Text style={styles.projectName} numberOfLines={1}>{projectName}</Text>
         <Text style={styles.projectPath} numberOfLines={1}>{projectPath}</Text>
       </View>
@@ -111,7 +85,7 @@ export default function AgentCard({ agent }: Props) {
       {/* Current tool */}
       {agent.currentTool && (
         <View style={styles.toolRow}>
-          <Ionicons name="construct" size={12} color="#60a5fa" />
+          <Ionicons name="construct" size={12} color={colors.blue} />
           <Text style={styles.toolText}>Tool: {agent.currentTool}</Text>
         </View>
       )}
@@ -139,7 +113,7 @@ export default function AgentCard({ agent }: Props) {
         </View>
         <View style={styles.tokenCell}>
           <Text style={styles.tokenLabel}>Kosten</Text>
-          <Text style={[styles.tokenValue, { color: '#facc15' }]}>${cost.toFixed(2)}</Text>
+          <Text style={[styles.tokenValue, { color: colors.yellow }]}>${cost.toFixed(2)}</Text>
         </View>
       </View>
     </View>
@@ -148,20 +122,20 @@ export default function AgentCard({ agent }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    backgroundColor: colors.elevated,
+    borderRadius: radius.md,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.borderStrong,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   status: {
-    fontSize: 13,
+    fontSize: fontSize.standard,
     fontWeight: '700',
     marginLeft: 6,
     textTransform: 'capitalize',
@@ -170,72 +144,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0a2a0a',
-    borderRadius: 6,
+    borderRadius: radius.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   activePulse: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#4ade80',
-    marginRight: 4,
+    backgroundColor: colors.accent,
+    marginRight: spacing.xs,
   },
   activeText: {
-    color: '#4ade80',
+    color: colors.accent,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1,
   },
   typeBadge: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    backgroundColor: colors.borderStrong,
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     marginLeft: 'auto',
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
-  typeText: { color: '#888', fontSize: 10, fontWeight: '600' },
-  duration: { color: '#666', fontSize: 11, fontFamily: 'monospace' },
+  typeText: { color: colors.textMuted, fontSize: fontSize.micro, fontWeight: '600' },
+  duration: { color: colors.textMuted, fontSize: fontSize.micro, fontFamily: 'monospace' },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   name: {
-    color: '#e0e0e0',
-    fontSize: 15,
+    color: colors.text,
+    fontSize: fontSize.body,
     fontWeight: '700',
     flex: 1,
   },
   modelBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderWidth: 1,
   },
   modelText: {
-    fontSize: 10,
+    fontSize: fontSize.micro,
     fontWeight: '700',
   },
   projectRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: '#151515',
-    borderRadius: 6,
-    padding: 8,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
   },
   projectName: {
-    color: '#e0e0e0',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: fontSize.standard,
     fontWeight: '600',
     marginLeft: 6,
   },
   projectPath: {
-    color: '#555',
-    fontSize: 10,
+    color: colors.textDim,
+    fontSize: fontSize.micro,
     fontFamily: 'monospace',
     marginLeft: 6,
     flex: 1,
@@ -246,15 +220,15 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   toolText: {
-    color: '#60a5fa',
-    fontSize: 11,
+    color: colors.blue,
+    fontSize: fontSize.micro,
     marginLeft: 6,
     fontFamily: 'monospace',
   },
   lastMessage: {
-    color: '#777',
-    fontSize: 11,
-    marginBottom: 8,
+    color: colors.textMuted,
+    fontSize: fontSize.micro,
+    marginBottom: spacing.sm,
     lineHeight: 16,
   },
   tokenGrid: {
@@ -265,20 +239,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: 6,
-    backgroundColor: '#111',
-    borderRadius: 6,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
     marginHorizontal: 2,
   },
   tokenLabel: {
-    color: '#555',
+    color: colors.textDim,
     fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   tokenValue: {
-    color: '#e0e0e0',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: fontSize.standard,
     fontWeight: '700',
     fontFamily: 'monospace',
     marginTop: 2,

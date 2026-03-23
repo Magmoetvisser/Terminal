@@ -236,7 +236,7 @@ function snapTo(value: number): number {
 }
 
 export default function GitHubScreen() {
-  const { serverUrl, githubToken, setGithubToken, accentColor, addSession, setActiveSessionId, setPendingTerminalInput } = useStore();
+  const { serverUrl, githubToken, setGithubToken, accentColor, addSession, setActiveSessionId } = useStore();
   const { apiFetch } = useApi();
   const { ghFetch, ghFetchRaw, ghFetchPages, ghPost, ghPatch, ghDelete } = useGitHub();
   const router = useRouter();
@@ -528,7 +528,6 @@ export default function GitHubScreen() {
       });
       addSession(session);
       setActiveSessionId(session.id);
-      setPendingTerminalInput(`${command}\r`);
       setSelectedRepo(null);
       router.push('/(tabs)/terminal');
     } catch (err: any) {

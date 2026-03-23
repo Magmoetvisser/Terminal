@@ -18,10 +18,12 @@ import AgentCard from '../../components/AgentCard';
 import FolderBrowser from '../../components/FolderBrowser';
 import { useApi } from '../../hooks/useApi';
 import { useStore, Agent } from '../../store';
+import { getStatusColor } from '../../constants/theme';
+import { formatDuration } from '../../utils/formatters';
 
 export default function AgentsScreen() {
   const { apiFetch } = useApi();
-  const { setAgents, addSession, setActiveSessionId } = useStore();
+  const { sessions, setAgents, addSession, setActiveSessionId, agentSessionMap, setAgentSession } = useStore();
   const router = useRouter();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [showNewAgent, setShowNewAgent] = useState(false);
@@ -88,6 +90,21 @@ export default function AgentsScreen() {
       Alert.alert('Geen project pad gevonden');
       return;
     }
+
+    // Check if agent already has an active session
+    const existingSessionId = agentSessionMap[agent.id];
+    if (existingSessionId) {
+      const existingSession = sessions.find(s => s.id === existingSessionId && s.active);
+      if (existingSession) {
+        setActiveSessionId(existingSessionId);
+        setSelectedAgent(null);
+        setTimeout(() => {
+          router.push('/(tabs)/terminal' as any);
+        }, 300);
+        return;
+      }
+    }
+
     try {
       const session = await apiFetch('/api/sessions', {
         method: 'POST',
@@ -95,6 +112,7 @@ export default function AgentsScreen() {
       });
       addSession(session);
       setActiveSessionId(session.id);
+      setAgentSession(agent.id, session.id);
       setSelectedAgent(null);
       setTimeout(() => {
         router.push('/(tabs)/terminal' as any);
@@ -358,29 +376,6 @@ export default function AgentsScreen() {
   );
 }
 
-function formatDuration(ms: number) {
-  if (!ms) return '0s';
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ${secs % 60}s`;
-  const hours = Math.floor(mins / 60);
-  return `${hours}h ${mins % 60}m`;
-}
-
-function getStatusColor(status: string) {
-  const s = (status || 'idle').toLowerCase();
-  const colors: Record<string, string> = {
-    working: '#4ade80',
-    thinking: '#facc15',
-    waiting: '#60a5fa',
-    idle: '#6b7280',
-    done: '#6b7280',
-    error: '#f87171',
-    help: '#c084fc',
-  };
-  return colors[s] || '#6b7280';
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0a' },

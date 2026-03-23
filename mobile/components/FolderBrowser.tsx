@@ -77,10 +77,10 @@ export default function FolderBrowser({ visible, onClose, onSelect, title = 'Kie
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#888" />
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+              <Ionicons name="close" size={18} color="#888" />
             </TouchableOpacity>
+            <Text style={styles.title}>{title}</Text>
           </View>
 
           <Text style={styles.currentPath} numberOfLines={1}>{currentPath}</Text>
@@ -161,11 +161,20 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
+  },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   title: { color: '#e0e0e0', fontSize: 17, fontWeight: '700' },
   currentPath: { color: '#555', fontSize: 11, fontFamily: 'monospace', paddingHorizontal: 16, paddingVertical: 6 },

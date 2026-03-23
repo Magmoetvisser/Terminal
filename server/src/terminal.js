@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const MAX_LOG_LINES = 10000;
 const sessions = new Map();
+let sessionCounter = 0;
 
 function createSession(workdir) {
   const id = crypto.randomUUID();
@@ -22,7 +23,7 @@ function createSession(workdir) {
     pty: ptyProcess,
     logs: [],
     workdir: cwd,
-    title: `Session ${sessions.size + 1}`,
+    title: `Session ${++sessionCounter}`,
     active: true,
     subscribers: new Set(),
     createdAt: new Date().toISOString(),
@@ -70,9 +71,13 @@ function resizeSession(sessionId, cols, rows) {
 function killSession(sessionId) {
   const session = sessions.get(sessionId);
   if (!session) return false;
-  session.pty.kill();
   session.active = false;
   sessions.delete(sessionId);
+  try {
+    session.pty.kill();
+  } catch (e) {
+    // pty may already be dead
+  }
   return true;
 }
 
@@ -89,11 +94,6 @@ function subscribe(sessionId, ws) {
     }));
   }
   return true;
-}
-
-function unsubscribe(sessionId, ws) {
-  const session = sessions.get(sessionId);
-  if (session) session.subscribers.delete(ws);
 }
 
 function unsubscribeAll(ws) {
@@ -124,7 +124,6 @@ module.exports = {
   resizeSession,
   killSession,
   subscribe,
-  unsubscribe,
   unsubscribeAll,
   listSessions,
   getSessionLogs,

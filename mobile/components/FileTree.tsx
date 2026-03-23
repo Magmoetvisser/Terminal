@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, radius, fontSize } from '../constants/theme';
 
 export interface FileItem {
   name: string;
@@ -26,8 +27,8 @@ const ICON_MAP: Record<string, { name: string; color: string }> = {
   '.ts': { name: 'logo-javascript', color: '#3178c6' },
   '.tsx': { name: 'logo-javascript', color: '#3178c6' },
   '.py': { name: 'logo-python', color: '#3776ab' },
-  '.json': { name: 'code-slash', color: '#facc15' },
-  '.md': { name: 'document-text', color: '#60a5fa' },
+  '.json': { name: 'code-slash', color: colors.yellow },
+  '.md': { name: 'document-text', color: colors.blue },
   '.html': { name: 'logo-html5', color: '#e34f26' },
   '.css': { name: 'logo-css3', color: '#1572b6' },
   '.git': { name: 'git-branch', color: '#f05032' },
@@ -35,10 +36,10 @@ const ICON_MAP: Record<string, { name: string; color: string }> = {
 
 function getFileIcon(item: FileItem) {
   if (item.isDirectory) {
-    return { name: 'folder' as const, color: '#facc15' };
+    return { name: 'folder' as const, color: colors.yellow };
   }
   const ext = '.' + item.name.split('.').pop()?.toLowerCase();
-  return ICON_MAP[ext] || { name: 'document' as const, color: '#888' };
+  return ICON_MAP[ext] || { name: 'document' as const, color: colors.textMuted };
 }
 
 function formatSize(bytes: number) {
@@ -52,7 +53,7 @@ export default function FileTree({ items, loading, onPress, onLongPress, onMenuP
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#4ade80" />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -61,7 +62,7 @@ export default function FileTree({ items, loading, onPress, onLongPress, onMenuP
     <View style={styles.container}>
       {currentPath && onNavigateUp && (
         <TouchableOpacity style={styles.upRow} onPress={onNavigateUp}>
-          <Ionicons name="arrow-up" size={16} color="#60a5fa" />
+          <Ionicons name="arrow-up" size={16} color={colors.blue} />
           <Text style={styles.upText}>..</Text>
           <Text style={styles.pathText} numberOfLines={1}>{currentPath}</Text>
         </TouchableOpacity>
@@ -88,11 +89,11 @@ export default function FileTree({ items, loading, onPress, onLongPress, onMenuP
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={styles.menuBtn}
                 >
-                  <Ionicons name="ellipsis-vertical" size={16} color="#666" />
+                  <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
               {item.isDirectory && !onMenuPress && (
-                <Ionicons name="chevron-forward" size={14} color="#444" />
+                <Ionicons name="chevron-forward" size={14} color={colors.textDim} />
               )}
             </TouchableOpacity>
           );
@@ -113,35 +114,35 @@ const styles = StyleSheet.create({
   upRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: spacing.md,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-    backgroundColor: '#0f0f0f',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   upText: {
-    color: '#60a5fa',
-    fontSize: 14,
+    color: colors.blue,
+    fontSize: fontSize.standard,
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   pathText: {
-    color: '#555',
-    fontSize: 11,
-    marginLeft: 8,
+    color: colors.textDim,
+    fontSize: fontSize.micro,
+    marginLeft: spacing.sm,
     flex: 1,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: spacing.md,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#141414',
+    borderBottomColor: colors.border,
   },
-  icon: { marginRight: 10, width: 20, textAlign: 'center' },
-  name: { color: '#e0e0e0', fontSize: 14, flex: 1 },
-  size: { color: '#555', fontSize: 11, fontFamily: 'monospace' },
-  emptyText: { color: '#555', fontSize: 14 },
-  menuBtn: { paddingLeft: 8 },
+  icon: { marginRight: spacing.md, width: 20, textAlign: 'center' },
+  name: { color: colors.text, fontSize: fontSize.standard, flex: 1 },
+  size: { color: colors.textDim, fontSize: fontSize.micro, fontFamily: 'monospace' },
+  emptyText: { color: colors.textDim, fontSize: fontSize.standard },
+  menuBtn: { paddingLeft: spacing.sm },
 });

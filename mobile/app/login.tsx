@@ -12,6 +12,7 @@ import {
 import { showAlert } from '../utils/alert';
 import { router } from 'expo-router';
 import { useAuth } from '../hooks/useAuth';
+import { colors, spacing, radius, fontSize } from '../constants/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -47,7 +48,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Server URL (bijv. http://192.168.1.10:3443)"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textDim}
           value={serverUrl}
           onChangeText={setServerUrl}
           autoCapitalize="none"
@@ -58,7 +59,7 @@ export default function LoginScreen() {
         <TextInput
           style={styles.input}
           placeholder="Wachtwoord"
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textDim}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -68,7 +69,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#0a0a0a" />
+            <ActivityIndicator color={colors.bg} />
           ) : (
             <Text style={styles.buttonText}>Verbinden</Text>
           )}
@@ -81,7 +82,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.bg,
   },
   inner: {
     flex: 1,
@@ -89,38 +90,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   title: {
-    color: '#e0e0e0',
-    fontSize: 32,
+    color: colors.text,
+    fontSize: fontSize.title,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    color: '#666',
-    fontSize: 14,
+    color: colors.textMuted,
+    fontSize: fontSize.standard,
     textAlign: 'center',
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#1a1a1a',
-    color: '#e0e0e0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 15,
-    marginBottom: 12,
+    backgroundColor: colors.elevated,
+    color: colors.text,
+    borderRadius: radius.md,
+    padding: 14,
+    fontSize: fontSize.body,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.borderStrong,
   },
   button: {
-    backgroundColor: '#4ade80',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    padding: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   buttonText: {
-    color: '#0a0a0a',
+    color: colors.bg,
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: fontSize.body,
   },
 });
