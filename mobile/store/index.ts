@@ -53,6 +53,10 @@ interface AppState {
   githubToken: string | null;
   agentSessionMap: Record<string, string>; // agentId -> sessionId
   terminalFontSize: number;
+  editorProjectPath: string | null;
+  editorCurrentDir: string;
+  editorOpenFile: { path: string; name: string; language: string } | null;
+  editorMode: 'browse' | 'tree' | 'editor';
 
   setServerUrl: (url: string) => void;
   setToken: (token: string | null) => void;
@@ -66,6 +70,10 @@ interface AppState {
   setGithubToken: (token: string | null) => void;
   setAgentSession: (agentId: string, sessionId: string) => void;
   setTerminalFontSize: (size: number) => void;
+  setEditorProjectPath: (path: string | null) => void;
+  setEditorCurrentDir: (dir: string) => void;
+  setEditorOpenFile: (file: { path: string; name: string; language: string } | null) => void;
+  setEditorMode: (mode: 'browse' | 'tree' | 'editor') => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -79,6 +87,10 @@ export const useStore = create<AppState>((set) => ({
   githubToken: null,
   agentSessionMap: {},
   terminalFontSize: 14,
+  editorProjectPath: null,
+  editorCurrentDir: '',
+  editorOpenFile: null,
+  editorMode: 'browse',
 
   setServerUrl: (url) => set({ serverUrl: url }),
   setToken: (token) => set({ token }),
@@ -98,6 +110,10 @@ export const useStore = create<AppState>((set) => ({
   setAgentSession: (agentId, sessionId) =>
     set((state) => ({ agentSessionMap: { ...state.agentSessionMap, [agentId]: sessionId } })),
   setTerminalFontSize: (size) => set({ terminalFontSize: size }),
+  setEditorProjectPath: (path) => set({ editorProjectPath: path }),
+  setEditorCurrentDir: (dir) => set({ editorCurrentDir: dir }),
+  setEditorOpenFile: (file) => set({ editorOpenFile: file }),
+  setEditorMode: (mode) => set({ editorMode: mode }),
 }));
 
 export function getAgentSession(agentId: string): string | null {

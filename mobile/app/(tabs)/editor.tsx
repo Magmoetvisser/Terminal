@@ -28,26 +28,42 @@ interface DirEntry {
 
 export default function EditorTab() {
   const { apiFetch } = useApi();
-  const { accentColor } = useStore();
+  const {
+    accentColor,
+    editorProjectPath: storedProjectPath,
+    editorCurrentDir: storedCurrentDir,
+    editorOpenFile: storedOpenFile,
+    editorMode: storedMode,
+    setEditorProjectPath,
+    setEditorCurrentDir,
+    setEditorOpenFile,
+    setEditorMode,
+  } = useStore();
 
   // Project selection
-  const [mode, setMode] = useState<ViewMode>('browse');
-  const [projectPath, setProjectPath] = useState<string | null>(null);
+  const [mode, _setMode] = useState<ViewMode>(storedMode);
+  const [projectPath, _setProjectPath] = useState<string | null>(storedProjectPath);
   const [browsePath, setBrowsePath] = useState('');
   const [browseDirs, setBrowseDirs] = useState<DirEntry[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
 
   // File tree
-  const [currentDir, setCurrentDir] = useState('');
+  const [currentDir, _setCurrentDir] = useState(storedCurrentDir);
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Editor
   const editorRef = useRef<CodeEditorRef>(null);
-  const [openFile, setOpenFile] = useState<{ path: string; name: string; language: string } | null>(null);
+  const [openFile, _setOpenFile] = useState<{ path: string; name: string; language: string } | null>(storedOpenFile);
   const [fileContent, setFileContent] = useState('');
   const [originalContent, setOriginalContent] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Wrappers that sync to store
+  const setMode = useCallback((m: ViewMode) => { _setMode(m); setEditorMode(m); }, [setEditorMode]);
+  const setProjectPath = useCallback((p: string | null) => { _setProjectPath(p); setEditorProjectPath(p); }, [setEditorProjectPath]);
+  const setCurrentDir = useCallback((d: string) => { _setCurrentDir(d); setEditorCurrentDir(d); }, [setEditorCurrentDir]);
+  const setOpenFile = useCallback((f: { path: string; name: string; language: string } | null) => { _setOpenFile(f); setEditorOpenFile(f); }, [setEditorOpenFile]);
 
   // Terminal — open by default like agents editor
   const [showTerminal, setShowTerminal] = useState(false);
@@ -79,9 +95,30 @@ export default function EditorTab() {
     }
   }, [apiFetch]);
 
-  // Load on mount
+  // Load on mount — restore previous state
   useEffect(() => {
-    if (mode === 'browse') loadBrowse(browsePath);
+    if (mode === 'browse') {
+      loadBrowse(browsePath);
+    } else if (mode === 'tree' && currentDir) {
+      loadDir(currentDir);
+    } else if (mode === 'editor' && openFile) {
+      // Reload file content for the previously open file
+      (async () => {
+        try {
+          const data = await apiFetch(`/api/files/read?path=${encodeURIComponent(openFile.path)}`);
+          if (!data.binary) {
+            setFileContent(data.content);
+            setOriginalContent(data.content);
+          }
+        } catch {
+          // File may have been deleted, fall back to tree
+          setMode('tree');
+          _setOpenFile(null);
+          setEditorOpenFile(null);
+          if (currentDir) loadDir(currentDir);
+        }
+      })();
+    }
   }, []);
 
   // Load file tree
