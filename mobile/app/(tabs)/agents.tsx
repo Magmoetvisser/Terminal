@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import AgentCard from '../../components/AgentCard';
 import FolderBrowser from '../../components/FolderBrowser';
 import { useApi } from '../../hooks/useApi';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { useStore, Agent } from '../../store';
 import { getStatusColor } from '../../constants/theme';
 import { formatDuration } from '../../utils/formatters';
@@ -24,6 +25,7 @@ import { formatDuration } from '../../utils/formatters';
 export default function AgentsScreen() {
   const { apiFetch } = useApi();
   const { sessions, setAgents, addSession, setActiveSessionId, agentSessionMap, setAgentSession } = useStore();
+  const { sendInput } = useWebSocket(() => {});
   const router = useRouter();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [showNewAgent, setShowNewAgent] = useState(false);
@@ -120,6 +122,34 @@ export default function AgentsScreen() {
     } catch (err: any) {
       Alert.alert('Error', err.message);
     }
+  };
+
+  const stopAgent = (agent: Agent) => {
+    const sessionId = agentSessionMap[agent.id];
+    if (!sessionId) {
+      Alert.alert('Geen sessie', 'Deze agent heeft geen gekoppelde terminal sessie.');
+      return;
+    }
+    const session = sessions.find(s => s.id === sessionId && s.active);
+    if (!session) {
+      Alert.alert('Sessie inactief', 'De gekoppelde terminal sessie is niet meer actief.');
+      return;
+    }
+    Alert.alert(
+      'Agent stoppen',
+      `Weet je zeker dat je ${agent.name || agent.id} wilt stoppen? Er wordt een Ctrl+C gestuurd.`,
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Stoppen',
+          style: 'destructive',
+          onPress: () => {
+            sendInput(sessionId, '\x03');
+            setSelectedAgent(null);
+          },
+        },
+      ],
+    );
   };
 
   const inactiveStatuses = ['done', 'error', 'offline'];
@@ -311,11 +341,19 @@ export default function AgentsScreen() {
                   {/* Open project button */}
                   {(selectedAgent.metadata?.projectPath || selectedAgent.project) && (
                     <TouchableOpacity style={styles.openProjectBtn} onPress={() => { setSelectedAgent(null); openAgentProject(selectedAgent); }}>
-                      <Ionicons name="code-slash" size={18} color="#0a0a0a" />
+                      <Ionicons name="code-slash" size={18} color="#e0e0e0" />
                       <Text style={styles.openProjectBtnText}>Editor</Text>
                     </TouchableOpacity>
                   )}
                 </View>
+
+                {/* Stop agent button */}
+                {selectedAgent.timing?.active && (
+                  <TouchableOpacity style={styles.stopBtn} onPress={() => stopAgent(selectedAgent)}>
+                    <Ionicons name="stop-circle" size={18} color="#f87171" />
+                    <Text style={styles.stopBtnText}>Agent stoppen</Text>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
             )}
           </View>
@@ -470,4 +508,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#4ade80', borderRadius: 10, padding: 14, marginTop: 12,
   },
   launchBtnText: { color: '#0a0a0a', fontWeight: '700', fontSize: 15, marginLeft: 8 },
+  stopBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2a1010', borderRadius: 10, padding: 14, marginTop: 8,
+    borderWidth: 1, borderColor: '#5a2020',
+  },
+  stopBtnText: { color: '#f87171', fontWeight: '700', fontSize: 13, marginLeft: 6 },
 });
