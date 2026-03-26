@@ -11,6 +11,7 @@ const { getSystemInfo } = require('./sysinfo');
 const files = require('./files');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 
 const PORT = parseInt(process.env.PORT) || 3443;
 const app = express();
@@ -230,6 +231,61 @@ app.post('/api/files/rename', (req, res) => {
   const result = files.renameItem(oldPath, newPath);
   if (result.error) return res.status(400).json(result);
   res.json(result);
+});
+
+// --- Git endpoints ---
+app.get('/api/git/status', (req, res) => {
+  const cwd = req.query.path || process.env.USERPROFILE || process.env.HOME;
+  execFile('git', ['status', '--porcelain=v1', '-uall'], { cwd }, (err, stdout) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const changedFiles = stdout.trim().split('\n').filter(Boolean).map(line => {
+      const status = line.substring(0, 2);
+      const filePath = line.substring(3);
+      let type = 'modified';
+      if (status.includes('?')) type = 'untracked';
+      else if (status.includes('A')) type = 'added';
+      else if (status.includes('D')) type = 'deleted';
+      else if (status.includes('R')) type = 'renamed';
+      return { status: status.trim(), file: filePath, type };
+    });
+    res.json({ files: changedFiles, cwd });
+  });
+});
+
+app.get('/api/git/diff', (req, res) => {
+  const cwd = req.query.path || process.env.USERPROFILE || process.env.HOME;
+  const file = req.query.file;
+  const args = ['diff', '--no-color'];
+  if (file) args.push('--', file);
+  execFile('git', args, { cwd, maxBuffer: 1024 * 1024 * 5 }, (err, stdout) => {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ diff: stdout });
+  });
+});
+
+app.get('/api/git/diff-staged', (req, res) => {
+  const cwd = req.query.path || process.env.USERPROFILE || process.env.HOME;
+  const file = req.query.file;
+  const args = ['diff', '--cached', '--no-color'];
+  if (file) args.push('--', file);
+  execFile('git', args, { cwd, maxBuffer: 1024 * 1024 * 5 }, (err, stdout) => {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json({ diff: stdout });
+  });
+});
+
+app.get('/api/git/log', (req, res) => {
+  const cwd = req.query.path || process.env.USERPROFILE || process.env.HOME;
+  const n = Math.min(parseInt(req.query.n) || 1, 100);
+  const SEP = '\x00';
+  execFile('git', ['log', `-${n}`, `--pretty=format:%H${SEP}%an${SEP}%s${SEP}%cr`], { cwd }, (err, stdout) => {
+    if (err) return res.status(400).json({ error: err.message });
+    const commits = stdout.trim().split('\n').filter(Boolean).map(line => {
+      const parts = line.split(SEP);
+      return { hash: parts[0], author: parts[1], message: parts.slice(2, -1).join(''), time: parts[parts.length - 1] };
+    });
+    res.json({ commits });
+  });
 });
 
 // --- Start server (HTTP for local dev, HTTPS for production) ---

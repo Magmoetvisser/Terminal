@@ -59,15 +59,15 @@ export default function CostsScreen() {
   return (
     <ScrollView
       style={styles.container}
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl
-              refreshing={statsLoading || sessionsLoading}
-              onRefresh={onRefresh}
-              tintColor={accentColor}
-            />
-          }
-        >
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={statsLoading || sessionsLoading}
+          onRefresh={onRefresh}
+          tintColor={accentColor}
+        />
+      }
+    >
           {/* Total cost hero */}
           <View style={styles.heroCard}>
             <View style={styles.heroRow}>

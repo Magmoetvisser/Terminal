@@ -10,18 +10,19 @@ Remote terminal voor je Windows PC, recht vanaf je iPhone. Bedien Claude Code se
 
 ```
 iPhone (Expo app)
-      │  HTTPS + WebSocket
-      ▼
+      |  HTTPS + WebSocket
+      v
 Cloudflare Tunnel (publiek adres)
-      │
-      ▼
-Windows PC ─── Node.js Server (Express + ws)
-                  ├── node-pty → PowerShell sessies
-                  ├── Pixel Agent Desk proxy (localhost:3000)
-                  ├── File system API (lezen/schrijven/browsen/hernoemen/verwijderen)
-                  └── systeminformation → CPU/RAM
+      |
+      v
+Windows PC --- Node.js Server (Express + ws)
+                  |-- node-pty -> PowerShell sessies
+                  |-- Pixel Agent Desk proxy (localhost:3000)
+                  |-- File system API (lezen/schrijven/browsen/hernoemen/verwijderen)
+                  |-- Git CLI (status/diff/log)
+                  +-- systeminformation -> CPU/RAM
 
-iPhone ──── GitHub REST API (directe connectie met fine-grained PAT)
+iPhone ---- GitHub REST API (directe connectie met fine-grained PAT)
 ```
 
 ## Features
@@ -30,7 +31,8 @@ iPhone ──── GitHub REST API (directe connectie met fine-grained PAT)
 - Volledige xterm.js terminal in een WebView
 - Meerdere gelijktijdige sessies met sessie-selector
 - Touch scrolling met momentum/inertia
-- Sneltoets-toolbar: `ESC`, `Ctrl+C`, `TAB`, `↑`, `↓`, `Ctrl+D`, `Ctrl+Z`, plakken
+- Sneltoets-toolbar: `ESC`, `Ctrl+C`, `TAB`, `<-`, `->`, `^`, `v`, `Ctrl+D`, `Ctrl+Z`, plakken
+- Pijltjes met hold-to-repeat (750ms delay, daarna 80ms interval)
 - Scroll-to-bottom knop
 
 ### GitHub Management
@@ -44,6 +46,15 @@ iPhone ──── GitHub REST API (directe connectie met fine-grained PAT)
 - **Releases** — releases met downloadbare assets
 - **Git operaties** — Clone, Pull, Push knoppen verbonden met terminal sessies
 - Slide-up detail modal met drag-to-resize (translateY animatie, snap points)
+
+### Changes
+- Git wijzigingen sinds laatste commit in een overzichtelijk scherm
+- Laatste commit card met message, auteur, hash en tijd
+- Bestanden gegroepeerd per type: gewijzigd, nieuw, verwijderd, untracked, hernoemd
+- Kleur-badges met tellingen (~modified, +added, -deleted, ?untracked)
+- Inline diff viewer per bestand (tap to expand)
+- Auto-refresh (10s polling) + pull-to-refresh
+- Clean state indicator wanneer alles gecommit is
 
 ### Code Editor
 - VS Code-achtige bestandsboom met type-iconen (JS, TS, Python, HTML, CSS, JSON, etc.)
@@ -68,10 +79,20 @@ iPhone ──── GitHub REST API (directe connectie met fine-grained PAT)
 - **Kosten** — gedetailleerd kosten-overzicht
 - CPU/RAM real-time monitoring
 
+### Splash Screen
+- Geanimeerde startup transitie met matrix rain effect
+- Logo animatie met spin + glow
+- HUSSLE tekst typing effect (letter voor letter)
+- Fade-out transitie naar de app
+- Opnieuw af te spelen via Instellingen
+
 ### Instellingen
 - Accent kleur aanpasbaar (persistent via SecureStore)
+- Terminal font grootte
 - Server connectie info
 - GitHub Personal Access Token beheer
+- Test splash screen knop
+- Alle sessies sluiten / lokale gegevens wissen
 
 ## Navigatie
 
@@ -82,6 +103,7 @@ Custom drawer navigatie met geanimeerd slide-in paneel:
 | Hoofd | Terminal | Remote PowerShell sessies |
 | Hoofd | Agents | Pixel Agent Desk monitoring |
 | Hoofd | GitHub | Volledige GitHub management |
+| Hoofd | Changes | Git wijzigingen sinds laatste commit |
 | Hoofd | Editor | VS Code-achtige code editor |
 | Monitor | Logs | Terminal log viewer |
 | Monitor | Usage | Token/kosten dashboard |
@@ -128,50 +150,53 @@ npx expo start            # Scan QR code met Expo Go
 
 ```
 terminal/
-├── server/
-│   └── src/
-│       ├── index.js          # Express + WebSocket server
-│       ├── auth.js           # JWT authenticatie
-│       ├── terminal.js       # node-pty sessie management
-│       ├── pixelAgents.js    # Pixel Agent Desk proxy
-│       ├── files.js          # File system operaties
-│       ├── sysinfo.js        # CPU/RAM info
-│       └── certgen.js        # Self-signed SSL generatie
-│
-└── mobile/
-    ├── app/
-    │   ├── _layout.tsx       # Auth redirect
-    │   ├── login.tsx         # Login scherm
-    │   └── (tabs)/
-    │       ├── _layout.tsx   # Drawer navigatie
-    │       ├── terminal.tsx  # Terminal met sessie-selector
-    │       ├── agents.tsx    # Agent overzicht + detail modal
-    │       ├── github.tsx    # GitHub management (repos, issues, PRs, etc.)
-    │       ├── editor.tsx    # Code editor met bestandsboom
-    │       ├── logs.tsx      # Terminal log viewer
-    │       ├── usage.tsx     # Usage dashboard
-    │       ├── costs.tsx     # Kosten overzicht
-    │       └── settings.tsx  # Instellingen
-    ├── components/
-    │   ├── TerminalWebView.tsx   # xterm.js WebView + scroll + toolbar
-    │   ├── EditorTerminal.tsx    # Zwevend terminal paneel
-    │   ├── CodeEditor.tsx        # WebView code editor met ref (execCommand/insertText)
-    │   ├── FileTree.tsx          # Bestandsboom met 3-puntjes menu
-    │   ├── AgentCard.tsx         # Agent kaart component
-    │   ├── FolderBrowser.tsx     # Map-kiezer modal
-    │   ├── CreateModal.tsx       # Aanmaak-opties modal
-    │   ├── UsageStats.tsx        # Token/kosten visualisatie
-    │   └── WebViewCompat.tsx     # Cross-platform WebView wrapper
-    ├── hooks/
-    │   ├── useAuth.ts        # JWT opslag + login/logout
-    │   ├── useApi.ts         # Authenticated fetch wrapper
-    │   ├── useWebSocket.ts   # WebSocket + auto-reconnect
-    │   └── useGitHub.ts      # GitHub REST API helpers (ghFetch/ghPost/ghPatch/etc.)
-    ├── utils/
-    │   ├── alert.ts          # Cross-platform alert (web fallback)
-    │   └── storage.ts        # SecureStore wrapper
-    └── store/
-        └── index.ts          # Zustand global state
+|-- server/
+|   +-- src/
+|       |-- index.js          # Express + WebSocket + git endpoints
+|       |-- auth.js           # JWT authenticatie
+|       |-- terminal.js       # node-pty sessie management
+|       |-- pixelAgents.js    # Pixel Agent Desk proxy
+|       |-- files.js          # File system operaties
+|       |-- sysinfo.js        # CPU/RAM info
+|       +-- certgen.js        # Self-signed SSL generatie
+|
++-- mobile/
+    |-- app/
+    |   |-- _layout.tsx       # Auth redirect + splash screen
+    |   |-- login.tsx         # Login scherm
+    |   +-- (tabs)/
+    |       |-- _layout.tsx   # Drawer navigatie
+    |       |-- terminal.tsx  # Terminal met sessie-selector
+    |       |-- agents.tsx    # Agent overzicht + detail modal
+    |       |-- github.tsx    # GitHub management (repos, issues, PRs, etc.)
+    |       |-- changes.tsx   # Git changes viewer
+    |       |-- editor.tsx    # Code editor met bestandsboom
+    |       |-- logs.tsx      # Terminal log viewer
+    |       |-- usage.tsx     # Usage dashboard
+    |       |-- costs.tsx     # Kosten overzicht
+    |       +-- settings.tsx  # Instellingen
+    |-- components/
+    |   |-- SplashScreen.tsx      # Animated startup transitie
+    |   |-- TerminalWebView.tsx   # xterm.js WebView + scroll + toolbar
+    |   |-- EditorTerminal.tsx    # Zwevend terminal paneel
+    |   |-- CodeEditor.tsx        # WebView code editor met ref
+    |   |-- FileTree.tsx          # Bestandsboom met 3-puntjes menu
+    |   |-- AgentCard.tsx         # Agent kaart component
+    |   |-- FolderBrowser.tsx     # Map-kiezer modal
+    |   |-- CreateModal.tsx       # Aanmaak-opties modal
+    |   +-- UsageStats.tsx        # Token/kosten visualisatie
+    |-- hooks/
+    |   |-- useAuth.ts        # JWT opslag + login/logout
+    |   |-- useApi.ts         # Authenticated fetch wrapper
+    |   |-- useWebSocket.ts   # WebSocket + auto-reconnect
+    |   +-- useGitHub.ts      # GitHub REST API helpers
+    |-- constants/
+    |   +-- theme.ts          # Kleuren, spacing, radius, font sizes
+    |-- utils/
+    |   |-- alert.ts          # Cross-platform alert
+    |   +-- storage.ts        # SecureStore wrapper
+    +-- store/
+        +-- index.ts          # Zustand global state
 ```
 
 ## Cloudflare Tunnel (optioneel)
@@ -202,6 +227,7 @@ ingress:
 | Mobile | React Native, Expo SDK 54, Expo Router v6, TypeScript |
 | State | Zustand, TanStack Query |
 | Terminal | xterm.js v5 (via WebView), node-pty |
+| Animaties | react-native-reanimated |
 | Server | Express, ws, Node.js |
 | Auth | JWT (jsonwebtoken), expo-secure-store |
 | GitHub | GitHub REST API, fine-grained PAT |

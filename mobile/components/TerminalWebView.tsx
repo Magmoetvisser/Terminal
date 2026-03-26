@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder, GestureResponderEvent, PanResponderGestureState, Keyboard, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Keyboard, ScrollView, TextInput } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -18,14 +18,22 @@ const XTERM_HTML = `
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0a0a0a; overflow: hidden; }
+    #wrap { position: relative; width: 100%; height: 100%; }
     #terminal { width: 100%; height: 100%; }
     .xterm { padding: 4px; }
     .xterm-viewport { overflow: hidden !important; }
     .xterm-helper-textarea { display: none !important; }
+    #overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 100; touch-action: none;
+    }
   </style>
 </head>
 <body>
-  <div id="terminal"></div>
+  <div id="wrap">
+    <div id="terminal"></div>
+    <div id="overlay"></div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0/lib/addon-fit.min.js"></script>
   <script>
@@ -77,7 +85,76 @@ const XTERM_HTML = `
       }
     });
 
-    // Scroll by N lines (called from React Native)
+    // --- Touch overlay for scrolling ---
+    const overlay = document.getElementById('overlay');
+    const LINE_HEIGHT = 17;
+    const FRICTION = 0.93;
+    const MIN_VEL = 0.2;
+    const TAP_THRESHOLD = 10;
+
+    let startY, startX, lastY, lastTime, isSwiping, momentumId;
+    let velocityY = 0, scrollAcc = 0;
+    let samples = [];
+
+    function stopMomentum() {
+      if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; }
+      velocityY = 0; scrollAcc = 0; samples = [];
+    }
+
+    function scrollPx(px) {
+      scrollAcc += px / LINE_HEIGHT;
+      const lines = Math.trunc(scrollAcc);
+      if (lines !== 0) { term.scrollLines(lines); scrollAcc -= lines; }
+    }
+
+    function glide() {
+      if (Math.abs(velocityY) < MIN_VEL) { momentumId = null; scrollAcc = 0; return; }
+      scrollPx(velocityY);
+      velocityY *= FRICTION;
+      momentumId = requestAnimationFrame(glide);
+    }
+
+    overlay.addEventListener('touchstart', (e) => {
+      stopMomentum();
+      const t = e.touches[0];
+      startY = lastY = t.clientY;
+      startX = t.clientX;
+      lastTime = Date.now();
+      isSwiping = false;
+      samples = [];
+    }, { passive: true });
+
+    overlay.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      const dy = lastY - t.clientY;
+      const now = Date.now();
+      if (!isSwiping) {
+        const totalDy = Math.abs(t.clientY - startY);
+        const totalDx = Math.abs(t.clientX - startX);
+        if (totalDy > TAP_THRESHOLD && totalDy > totalDx) isSwiping = true;
+        else return;
+      }
+      scrollPx(dy);
+      samples.push({ v: dy / Math.max(now - lastTime, 1) * 16, t: now });
+      if (samples.length > 5) samples.shift();
+      lastY = t.clientY;
+      lastTime = now;
+      e.preventDefault();
+    }, { passive: false });
+
+    overlay.addEventListener('touchend', (e) => {
+      if (!isSwiping) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'focusInput' }));
+        return;
+      }
+      const now = Date.now();
+      const recent = samples.filter(s => now - s.t < 100);
+      if (recent.length > 0) {
+        velocityY = recent.reduce((a, s) => a + s.v, 0) / recent.length;
+        if (Math.abs(velocityY) > MIN_VEL) momentumId = requestAnimationFrame(glide);
+      }
+    }, { passive: true });
+
     window.scrollLines = (n) => { try { term.scrollLines(n); } catch(e) {} };
     window.focusTerm = () => { try { term.focus(); } catch(e) {} };
 
@@ -104,10 +181,6 @@ const XTERM_HTML = `
     window.clearTerminal = () => { try { term.clear(); } catch(e) {} };
     window.scrollToBottom = () => { try { term.scrollToBottom(); isAtBottom = true; window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scrollState', atBottom: true })); } catch(e) {} };
 
-    document.addEventListener('click', () => {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'focusInput' }));
-    });
-
     } catch(e) {
       document.body.innerText = 'Terminal error: ' + e.message;
     }
@@ -129,10 +202,6 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
     });
     const hideSub = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardHeight(0);
-      if (backspaceTimer.current) {
-        clearInterval(backspaceTimer.current);
-        backspaceTimer.current = null;
-      }
     });
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
@@ -170,26 +239,40 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
 
   const SENTINEL = ' ';
   const [inputValue, setInputValue] = useState(SENTINEL);
-  const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
 
-  const startBackspace = useCallback(() => {
-    if (backspaceTimer.current) return;
-    onInput('\x7f');
-    backspaceTimer.current = setInterval(() => onInput('\x7f'), 80);
-  }, [onInput]);
-
-  const stopBackspace = useCallback(() => {
-    if (backspaceTimer.current) {
-      clearInterval(backspaceTimer.current);
-      backspaceTimer.current = null;
-    }
-  }, []);
+  const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sendKey = useCallback((key: string) => {
     if (toolbarScrolling.current) return;
     onInput(key);
   }, [onInput]);
+
+  const repeatDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startRepeat = useCallback((key: string) => {
+    if (repeatTimer.current || repeatDelay.current) return;
+    onInput(key);
+    repeatDelay.current = setTimeout(() => {
+      repeatDelay.current = null;
+      repeatTimer.current = setInterval(() => onInput(key), 80);
+    }, 750);
+  }, [onInput]);
+
+  const stopRepeat = useCallback(() => {
+    if (repeatDelay.current) {
+      clearTimeout(repeatDelay.current);
+      repeatDelay.current = null;
+    }
+    if (repeatTimer.current) {
+      clearInterval(repeatTimer.current);
+      repeatTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => { stopRepeat(); };
+  }, [stopRepeat]);
 
   const pasteFromClipboard = useCallback(async () => {
     if (toolbarScrolling.current) return;
@@ -250,13 +333,9 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           nestedScrollEnabled
           onScrollBeginDrag={() => { toolbarScrolling.current = true; }}
           onScrollEndDrag={() => {
-            Keyboard.dismiss();
-            webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
             setTimeout(() => { toolbarScrolling.current = false; }, 200);
           }}
           onMomentumScrollEnd={() => {
-            Keyboard.dismiss();
-            webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
             toolbarScrolling.current = false;
           }}
         >
@@ -290,10 +369,16 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           <TouchableOpacity style={styles.toolbarBtn} onPress={pasteFromClipboard} activeOpacity={0.6}>
             <Text style={styles.toolbarBtnText}>Plak</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[A')} activeOpacity={0.6}>
+          <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[D')} onPressOut={stopRepeat} activeOpacity={0.6}>
+            <Ionicons name="arrow-back" size={14} color="#aaa" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[C')} onPressOut={stopRepeat} activeOpacity={0.6}>
+            <Ionicons name="arrow-forward" size={14} color="#aaa" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[A')} onPressOut={stopRepeat} activeOpacity={0.6}>
             <Ionicons name="arrow-up" size={14} color="#aaa" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[B')} activeOpacity={0.6}>
+          <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[B')} onPressOut={stopRepeat} activeOpacity={0.6}>
             <Ionicons name="arrow-down" size={14} color="#aaa" />
           </TouchableOpacity>
         </ScrollView>
@@ -320,7 +405,6 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
         caretHidden
         style={styles.hiddenInput}
         onChangeText={(text) => {
-          stopBackspace();
           if (text.length > SENTINEL.length) {
             const typed = text.slice(SENTINEL.length);
             onInput(typed);
@@ -329,11 +413,7 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           }
           setInputValue(SENTINEL);
         }}
-        onKeyPress={({ nativeEvent }) => {
-          if (nativeEvent.key === 'Backspace') startBackspace();
-        }}
         onSubmitEditing={() => {
-          stopBackspace();
           onInput('\r');
           setInputValue(SENTINEL);
         }}

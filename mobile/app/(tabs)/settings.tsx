@@ -749,6 +749,14 @@ export default function SettingsScreen() {
           <Ionicons name="trash-outline" size={16} color={colors.red} />
           <Text style={styles.dangerBtnText}>Alle lokale gegevens wissen</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.dangerBtn, { borderColor: accentColor + '40' }]}
+          onPress={() => useStore.getState().setShowSplash(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="refresh-outline" size={16} color={accentColor} />
+          <Text style={[styles.dangerBtnText, { color: accentColor }]}>Test splash screen</Text>
+        </TouchableOpacity>
       </View>
 
       {/* === OVER === */}
