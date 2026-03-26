@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
+import { useStore } from '../store';
+import SplashScreen from '../components/SplashScreen';
 
 const queryClient = new QueryClient();
 
@@ -32,6 +34,9 @@ function AuthRedirect() {
 }
 
 export default function RootLayout() {
+  const showSplash = useStore((s) => s.showSplash);
+  const setShowSplash = useStore((s) => s.setShowSplash);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthRedirect />
@@ -48,6 +53,7 @@ export default function RootLayout() {
         <Stack.Screen name="editor/[path]" options={{ headerShown: true, title: 'Editor' }} />
         <Stack.Screen name="agent-history/[id]" options={{ headerShown: true, title: 'Geschiedenis', animation: 'slide_from_right' }} />
       </Stack>
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </QueryClientProvider>
   );
 }
