@@ -11,6 +11,7 @@ const { getSystemInfo } = require('./sysinfo');
 const files = require('./files');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 
 const PORT = parseInt(process.env.PORT) || 3443;
 const app = express();

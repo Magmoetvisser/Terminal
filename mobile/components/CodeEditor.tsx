@@ -141,6 +141,22 @@ function WebCodeEditor({ content, language, onChange, readOnly }: Props) {
     return () => window.removeEventListener('message', handler);
   }, [onChange]);
 
+  // Update content when props change after initial load
+  const lastSentContent = useRef(content);
+  useEffect(() => {
+    if (loaded.current && iframeRef.current?.contentWindow && content !== lastSentContent.current) {
+      lastSentContent.current = content;
+      const escaped = JSON.stringify(content);
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ type: 'setContent', text: escaped, readOnly: readOnly || false }),
+        '*',
+      );
+      try {
+        (iframeRef.current.contentWindow as any)?.setContent?.(content, readOnly || false);
+      } catch {}
+    }
+  }, [content, readOnly]);
+
   // Patch the HTML to use parent.postMessage instead of ReactNativeWebView
   const webHtml = EDITOR_HTML.replace(
     /window\.ReactNativeWebView\.postMessage/g,
@@ -209,6 +225,18 @@ const NativeCodeEditor = forwardRef<CodeEditorRef, Props>(function NativeCodeEdi
     webViewRef.current?.injectJavaScript(
       `window.setContent(${escaped}, ${readOnly || false}); true;`
     );
+  }, [content, readOnly]);
+
+  // Update content when props change after initial load
+  const lastSentContent = useRef(content);
+  useEffect(() => {
+    if (loadedRef.current && webViewRef.current && content !== lastSentContent.current) {
+      lastSentContent.current = content;
+      const escaped = JSON.stringify(content);
+      webViewRef.current.injectJavaScript(
+        `window.setContent(${escaped}, ${readOnly || false}); true;`
+      );
+    }
   }, [content, readOnly]);
 
   if (!WebView) {

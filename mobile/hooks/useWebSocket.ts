@@ -9,7 +9,12 @@ export function useWebSocket(onMessage?: MessageHandler) {
   const handlersRef = useRef(new Set<MessageHandler>());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  if (onMessage) handlersRef.current.add(onMessage);
+  useEffect(() => {
+    if (onMessage) {
+      handlersRef.current.add(onMessage);
+      return () => { handlersRef.current.delete(onMessage); };
+    }
+  }, [onMessage]);
 
   const connect = useCallback(() => {
     if (!serverUrl || !token) return;

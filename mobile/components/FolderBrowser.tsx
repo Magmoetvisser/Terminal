@@ -59,7 +59,7 @@ export default function FolderBrowser({ visible, onClose, onSelect, title = 'Kie
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
     try {
-      const fullPath = currentPath + '\\' + newFolderName.trim();
+      const fullPath = currentPath + '/' + newFolderName.trim();
       await apiFetch('/api/files/create', {
         method: 'POST',
         body: JSON.stringify({ path: fullPath, isDirectory: true }),

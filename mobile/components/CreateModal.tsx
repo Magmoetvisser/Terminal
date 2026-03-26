@@ -257,7 +257,7 @@ export default function CreateModal({ visible, onClose, onSessionCreated, onSend
         <Ionicons name="chevron-forward" size={14} color="#444" />
       </TouchableOpacity>
       {selectedFolder && input.trim() ? (
-        <Text style={styles.previewPath}>{selectedFolder}\{input.trim()}</Text>
+        <Text style={styles.previewPath}>{selectedFolder}/{input.trim()}</Text>
       ) : null}
       <TouchableOpacity
         style={[styles.submit, (!input.trim() || !selectedFolder) && styles.submitDisabled]}

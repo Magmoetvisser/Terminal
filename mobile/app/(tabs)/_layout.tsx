@@ -91,7 +91,7 @@ export default function DrawerLayout() {
 
   const navigateTo = (route: string) => {
     router.push(route as any);
-    // Drawer stays open — no close
+    closeDrawer();
   };
 
   // Determine active route from pathname

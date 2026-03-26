@@ -133,7 +133,7 @@ export default function EditorTab() {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, [apiFetch, setCurrentDir]);
 
   const selectProject = (path: string) => {
     setProjectPath(path);

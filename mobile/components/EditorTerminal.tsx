@@ -347,7 +347,6 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
 
   const SENTINEL = ' ';
   const [inputValue, setInputValue] = useState(SENTINEL);
-  const prevInputText = useRef('');
   const backspaceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const toolbarScrolling = useRef(false);
 
@@ -366,10 +365,40 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
     }
   }, []);
 
+  const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const sendKey = useCallback((key: string) => {
     if (toolbarScrolling.current) return;
     if (sessionId) sendInput(sessionId, key);
   }, [sessionId, sendInput]);
+
+  const repeatDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startRepeat = useCallback((key: string) => {
+    if (repeatTimer.current || repeatDelay.current) return;
+    if (sessionId) sendInput(sessionId, key);
+    repeatDelay.current = setTimeout(() => {
+      repeatDelay.current = null;
+      repeatTimer.current = setInterval(() => {
+        if (sessionId) sendInput(sessionId, key);
+      }, 80);
+    }, 750);
+  }, [sessionId, sendInput]);
+
+  const stopRepeat = useCallback(() => {
+    if (repeatDelay.current) {
+      clearTimeout(repeatDelay.current);
+      repeatDelay.current = null;
+    }
+    if (repeatTimer.current) {
+      clearInterval(repeatTimer.current);
+      repeatTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => { stopRepeat(); stopBackspace(); };
+  }, [stopRepeat, stopBackspace]);
 
   const pasteFromClipboard = useCallback(async () => {
     if (toolbarScrolling.current) return;
@@ -411,13 +440,9 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         nestedScrollEnabled
         onScrollBeginDrag={() => { toolbarScrolling.current = true; }}
         onScrollEndDrag={() => {
-          Keyboard.dismiss();
-          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
           setTimeout(() => { toolbarScrolling.current = false; }, 200);
         }}
         onMomentumScrollEnd={() => {
-          Keyboard.dismiss();
-          webViewRef.current?.injectJavaScript(`if(term)term.blur(); true;`);
           toolbarScrolling.current = false;
         }}
       >
@@ -451,10 +476,16 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         <TouchableOpacity style={styles.toolbarBtn} onPress={pasteFromClipboard} activeOpacity={0.6}>
           <Text style={styles.toolbarBtnText}>Plak</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[A')} activeOpacity={0.6}>
+        <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[D')} onPressOut={stopRepeat} activeOpacity={0.6}>
+          <Ionicons name="arrow-back" size={14} color="#aaa" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[C')} onPressOut={stopRepeat} activeOpacity={0.6}>
+          <Ionicons name="arrow-forward" size={14} color="#aaa" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[A')} onPressOut={stopRepeat} activeOpacity={0.6}>
           <Ionicons name="arrow-up" size={14} color="#aaa" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={() => sendKey('\x1b[B')} activeOpacity={0.6}>
+        <TouchableOpacity style={styles.toolbarBtn} onPressIn={() => startRepeat('\x1b[B')} onPressOut={stopRepeat} activeOpacity={0.6}>
           <Ionicons name="arrow-down" size={14} color="#aaa" />
         </TouchableOpacity>
       </ScrollView>
@@ -474,6 +505,7 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
         autoCorrect={false}
         autoComplete="off"
         spellCheck={false}
+        caretHidden
         keyboardAppearance="dark"
         blurOnSubmit={false}
         returnKeyType="send"
@@ -520,7 +552,7 @@ export default function EditorTerminal({ projectPath, visible, onClose }: Props)
             onHttpError={() => {}}
           />
         )}
-        <Animated.View style={[styles.scrollBtnWrap, { opacity: btnOpacity }]} pointerEvents={showScrollBtn ? 'auto' : 'none'}>
+        <Animated.View style={[styles.scrollBtnWrap, { opacity: btnOpacity }]} pointerEvents={showScrollBtn ? 'box-none' : 'none'}>
           <TouchableOpacity style={styles.scrollBtn} onPress={scrollToBottom} activeOpacity={0.8}>
             <Ionicons name="arrow-down" size={16} color="#0a0a0a" />
           </TouchableOpacity>
