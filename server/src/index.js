@@ -234,7 +234,20 @@ app.post('/api/files/rename', (req, res) => {
 });
 
 // --- Git endpoints ---
+const ALLOWED_GIT_BASES = [
+  path.resolve(process.env.USERPROFILE || process.env.HOME || 'C:\\Users'),
+];
+
+function validateGitPath(dir) {
+  if (!dir) return false;
+  const resolved = path.resolve(dir);
+  return ALLOWED_GIT_BASES.some(base => resolved.startsWith(base));
+}
+
 function runGit(args, cwd, res) {
+  if (!validateGitPath(cwd)) {
+    return res.status(403).json({ error: 'Access denied: path outside allowed directories' });
+  }
   execFile('git', args, { cwd, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
     if (err) return res.status(500).json({ error: stderr || err.message });
     res.json({ output: stdout });
@@ -244,10 +257,7 @@ function runGit(args, cwd, res) {
 app.get('/api/git/status', (req, res) => {
   const dir = req.query.path;
   if (!dir) return res.status(400).json({ error: 'path required' });
-  execFile('git', ['status', '--porcelain'], { cwd: dir, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
-    if (err) return res.status(500).json({ error: stderr || err.message });
-    res.json({ output: stdout });
-  });
+  runGit(['status', '--porcelain'], dir, res);
 });
 
 app.get('/api/git/diff', (req, res) => {
@@ -278,9 +288,11 @@ app.get('/api/git/log', (req, res) => {
 app.get('/api/git/numstat', (req, res) => {
   const dir = req.query.path;
   if (!dir) return res.status(400).json({ error: 'path required' });
+  if (!validateGitPath(dir)) {
+    return res.status(403).json({ error: 'Access denied: path outside allowed directories' });
+  }
   execFile('git', ['diff', '--numstat'], { cwd: dir, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
     if (err) return res.status(500).json({ error: stderr || err.message });
-    // Also get staged changes
     execFile('git', ['diff', '--cached', '--numstat'], { cwd: dir, maxBuffer: 1024 * 1024 }, (err2, stdoutStaged) => {
       if (err2) return res.status(500).json({ error: err2.message });
       res.json({ unstaged: stdout, staged: stdoutStaged || '' });
