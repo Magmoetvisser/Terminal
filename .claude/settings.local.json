@@ -16,7 +16,9 @@
       "Bash(curl -s http://localhost:3000/api/sessions)",
       "Bash(pkill -f \"serve dist\")",
       "Bash(netsh advfirewall:*)",
-      "Bash(rtk git:*)"
+      "Bash(rtk git:*)",
+      "Bash(node -c src/index.js)",
+      "Bash(wc:*)"
     ]
   }
 }
