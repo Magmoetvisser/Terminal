@@ -7,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 interface Props {
   onInput: (data: string) => void;
   onResize?: (cols: number, rows: number) => void;
+  onReady?: () => void;
 }
 
 const XTERM_HTML = `
@@ -181,6 +182,9 @@ const XTERM_HTML = `
     window.clearTerminal = () => { try { term.clear(); } catch(e) {} };
     window.scrollToBottom = () => { try { term.scrollToBottom(); isAtBottom = true; window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'scrollState', atBottom: true })); } catch(e) {} };
 
+    // Signal that xterm is ready
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+
     } catch(e) {
       document.body.innerText = 'Terminal error: ' + e.message;
     }
@@ -189,7 +193,7 @@ const XTERM_HTML = `
 </html>
 `;
 
-export default function TerminalWebView({ onInput, onResize }: Props) {
+export default function TerminalWebView({ onInput, onResize, onReady }: Props) {
   const webViewRef = useRef<WebView>(null);
   const inputRef = useRef<TextInput>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -226,10 +230,12 @@ export default function TerminalWebView({ onInput, onResize }: Props) {
           setShowScrollBtn(!msg.atBottom);
         } else if (msg.type === 'focusInput') {
           inputRef.current?.focus();
+        } else if (msg.type === 'ready') {
+          onReady?.();
         }
       } catch {}
     },
-    [onInput, onResize],
+    [onInput, onResize, onReady],
   );
 
   const scrollToBottom = useCallback(() => {
