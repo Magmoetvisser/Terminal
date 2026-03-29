@@ -288,6 +288,139 @@ app.get('/api/git/numstat', (req, res) => {
   });
 });
 
+// POST /api/git/add - Stage files
+app.post('/api/git/add', (req, res) => {
+  const { path: dir, files } = req.body;
+  if (!dir || !files?.length) return res.status(400).json({ error: 'path and files required' });
+  runGit(['add', '--', ...files], dir, res);
+});
+
+// POST /api/git/unstage - Unstage files
+app.post('/api/git/unstage', (req, res) => {
+  const { path: dir, files } = req.body;
+  if (!dir || !files?.length) return res.status(400).json({ error: 'path and files required' });
+  runGit(['reset', 'HEAD', '--', ...files], dir, res);
+});
+
+// POST /api/git/add-all - Stage all
+app.post('/api/git/add-all', (req, res) => {
+  const { path: dir } = req.body;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['add', '-A'], dir, res);
+});
+
+// POST /api/git/commit
+app.post('/api/git/commit', (req, res) => {
+  const { path: dir, message, amend } = req.body;
+  if (!dir || !message) return res.status(400).json({ error: 'path and message required' });
+  const args = ['commit', '-m', message];
+  if (amend) args.push('--amend');
+  runGit(args, dir, res);
+});
+
+// POST /api/git/fetch
+app.post('/api/git/fetch', (req, res) => {
+  const { path: dir } = req.body;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['fetch', '--all'], dir, res);
+});
+
+// GET /api/git/branches
+app.get('/api/git/branches', (req, res) => {
+  const dir = req.query.path;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['branch', '-a', '--format=%(refname:short)||%(objectname:short)||%(upstream:short)||%(HEAD)'], dir, res);
+});
+
+// POST /api/git/checkout
+app.post('/api/git/checkout', (req, res) => {
+  const { path: dir, branch } = req.body;
+  if (!dir || !branch) return res.status(400).json({ error: 'path and branch required' });
+  runGit(['checkout', branch], dir, res);
+});
+
+// POST /api/git/branch/create
+app.post('/api/git/branch/create', (req, res) => {
+  const { path: dir, name, base } = req.body;
+  if (!dir || !name) return res.status(400).json({ error: 'path and name required' });
+  const args = ['checkout', '-b', name];
+  if (base) args.push(base);
+  runGit(args, dir, res);
+});
+
+// DELETE /api/git/branch
+app.delete('/api/git/branch', (req, res) => {
+  const dir = req.query.path;
+  const name = req.query.name;
+  if (!dir || !name) return res.status(400).json({ error: 'path and name required' });
+  runGit(['branch', '-d', name], dir, res);
+});
+
+// GET /api/git/stash/list
+app.get('/api/git/stash/list', (req, res) => {
+  const dir = req.query.path;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['stash', 'list'], dir, res);
+});
+
+// POST /api/git/stash
+app.post('/api/git/stash', (req, res) => {
+  const { path: dir, message } = req.body;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  const args = ['stash', 'push'];
+  if (message) args.push('-m', message);
+  runGit(args, dir, res);
+});
+
+// POST /api/git/stash/pop
+app.post('/api/git/stash/pop', (req, res) => {
+  const { path: dir, index } = req.body;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  const args = ['stash', 'pop'];
+  if (index !== undefined) args.push(`stash@{${index}}`);
+  runGit(args, dir, res);
+});
+
+// DELETE /api/git/stash
+app.delete('/api/git/stash', (req, res) => {
+  const dir = req.query.path;
+  const index = req.query.index;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  const args = ['stash', 'drop'];
+  if (index !== undefined) args.push(`stash@{${index}}`);
+  runGit(args, dir, res);
+});
+
+// GET /api/git/tags
+app.get('/api/git/tags', (req, res) => {
+  const dir = req.query.path;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['tag', '-l', '--format=%(refname:short)||%(objectname:short)||%(creatordate:relative)||%(subject)'], dir, res);
+});
+
+// POST /api/git/tag
+app.post('/api/git/tag', (req, res) => {
+  const { path: dir, name, message } = req.body;
+  if (!dir || !name) return res.status(400).json({ error: 'path and name required' });
+  const args = message ? ['tag', '-a', name, '-m', message] : ['tag', name];
+  runGit(args, dir, res);
+});
+
+// DELETE /api/git/tag
+app.delete('/api/git/tag', (req, res) => {
+  const dir = req.query.path;
+  const name = req.query.name;
+  if (!dir || !name) return res.status(400).json({ error: 'path and name required' });
+  runGit(['tag', '-d', name], dir, res);
+});
+
+// GET /api/git/current-branch
+app.get('/api/git/current-branch', (req, res) => {
+  const dir = req.query.path;
+  if (!dir) return res.status(400).json({ error: 'path required' });
+  runGit(['rev-parse', '--abbrev-ref', 'HEAD'], dir, res);
+});
+
 // --- Start server (HTTP for local dev, HTTPS for production) ---
 const http = require('http');
 const USE_HTTPS = process.env.USE_HTTPS === 'true';
