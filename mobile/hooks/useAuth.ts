@@ -20,7 +20,10 @@ export function useAuth() {
 
   const login = useCallback(
     async (url: string, password: string) => {
-      const cleanUrl = url.replace(/\/+$/, '');
+      let cleanUrl = url.replace(/\/+$/, '');
+      if (!/^https?:\/\//i.test(cleanUrl)) {
+        cleanUrl = `http://${cleanUrl}`;
+      }
       const res = await fetch(`${cleanUrl}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

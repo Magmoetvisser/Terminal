@@ -30,7 +30,9 @@ export default function LoginScreen() {
       await login(serverUrl.trim(), password);
       router.replace('/(tabs)/terminal' as any);
     } catch (err: any) {
-      showAlert('Login mislukt', err.message);
+      const url = serverUrl.trim().replace(/\/+$/, '');
+      const fullUrl = /^https?:\/\//i.test(url) ? url : `http://${url}`;
+      showAlert('Login mislukt', `${err.message}\n\nURL: ${fullUrl}/auth`);
     } finally {
       setLoading(false);
     }

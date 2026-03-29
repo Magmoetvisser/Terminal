@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TerminalWebView from '../../components/TerminalWebView';
@@ -26,26 +26,11 @@ export default function TerminalScreen() {
   );
 
   const { sendInput, subscribe, resize } = useWebSocket(handleWsMessage);
-  const handleWebViewReady = useCallback(() => {
-    wasEverReady.current = true;
-    if (activeSessionId) {
-      subscribe(activeSessionId);
-    }
-  }, [activeSessionId, subscribe]);
-
-  // Track if WebView was already mounted (switching sessions vs first mount)
-  const wasEverReady = useRef(false);
 
   useEffect(() => {
     if (activeSessionId) {
       TerminalWebView.clear();
-      if (wasEverReady.current) {
-        // WebView already loaded (switching sessions), subscribe immediately
-        subscribe(activeSessionId);
-      }
-      // Otherwise, subscribe will happen when WebView signals ready
-    } else {
-      wasEverReady.current = false;
+      subscribe(activeSessionId);
     }
   }, [activeSessionId, subscribe]);
 
@@ -152,7 +137,7 @@ export default function TerminalScreen() {
 
       {/* Terminal */}
       {activeSessionId ? (
-        <TerminalWebView onInput={handleInput} onResize={handleResize} onReady={handleWebViewReady} />
+        <TerminalWebView onInput={handleInput} onResize={handleResize} />
       ) : (
         <View style={styles.empty}>
           <Ionicons name="terminal" size={48} color={colors.textDim} />
