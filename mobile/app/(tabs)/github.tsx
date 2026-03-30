@@ -429,8 +429,8 @@ export default function GitHubScreen() {
 
   // Fetch commits
   const { data: commits = [], isLoading: loadingCommits } = useQuery<Commit[]>({
-    queryKey: ['github-commits', selectedRepo?.full_name],
-    queryFn: () => ghFetch(`/repos/${selectedRepo!.full_name}/commits?per_page=30`),
+    queryKey: ['github-commits', selectedRepo?.full_name, selectedBranch],
+    queryFn: () => ghFetch(`/repos/${selectedRepo!.full_name}/commits?per_page=30${selectedBranch ? `&sha=${encodeURIComponent(selectedBranch)}` : ''}`),
     enabled: !!selectedRepo && detailTab === 'commits',
     staleTime: 30000,
   });
