@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { getItem, setItem, deleteItem } from '../../utils/storage';
+import { getRecentUrls } from '../../utils/recentUrls';
 import { showAlert } from '../../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store';
@@ -239,6 +240,10 @@ export default function SettingsScreen() {
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const slidingRef = useRef(false);
 
+  // Recent URLs dropdown
+  const [recentUrls, setRecentUrls] = useState<string[]>([]);
+  const [showUrlDropdown, setShowUrlDropdown] = useState(false);
+
   // Server status
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [serverUptime, setServerUptime] = useState<string | null>(null);
@@ -257,6 +262,7 @@ export default function SettingsScreen() {
     getItem(FONT_SIZE_KEY).then((stored) => {
       if (stored) setTerminalFontSize(parseInt(stored, 10));
     });
+    getRecentUrls().then(setRecentUrls);
   }, []);
 
   // Check server status
@@ -506,10 +512,41 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <SectionHeader icon="server" title="VERBINDING" color={colors.blue} />
         <View style={styles.card}>
-          <View style={styles.infoRow}>
+          <TouchableOpacity
+            style={styles.infoRow}
+            onPress={() => recentUrls.length > 1 ? setShowUrlDropdown(!showUrlDropdown) : undefined}
+            activeOpacity={recentUrls.length > 1 ? 0.7 : 1}
+          >
             <Text style={styles.infoLabel}>Server</Text>
-            <Text style={styles.infoValue} numberOfLines={1}>{serverUrl || '—'}</Text>
-          </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'flex-end', gap: 6 }}>
+              <Text style={styles.infoValue} numberOfLines={1}>{serverUrl || '—'}</Text>
+              {recentUrls.length > 1 && (
+                <Ionicons
+                  name={showUrlDropdown ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={colors.textMuted}
+                />
+              )}
+            </View>
+          </TouchableOpacity>
+          {showUrlDropdown && recentUrls.filter((u) => u !== serverUrl).map((url, idx, arr) => (
+            <React.Fragment key={url}>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.infoRow}
+                onPress={() => {
+                  setShowUrlDropdown(false);
+                  router.push({ pathname: '/login', params: { prefillUrl: url } } as any);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="server-outline" size={14} color={colors.textDim} style={{ marginRight: 8 }} />
+                <Text style={[styles.infoValue, { textAlign: 'left', color: colors.textDim, flex: 1 }]} numberOfLines={1}>
+                  {url}
+                </Text>
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Status</Text>
