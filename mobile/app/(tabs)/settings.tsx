@@ -281,9 +281,10 @@ export default function SettingsScreen() {
         setServerUptime(null);
       }
     };
-    checkServer();
+    // Small delay so Zustand store is hydrated before first check
+    const initial = setTimeout(checkServer, 500);
     const interval = setInterval(checkServer, 30000);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(initial); clearInterval(interval); };
   }, [apiFetch]);
 
   // Fetch GitHub username
