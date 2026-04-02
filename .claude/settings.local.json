@@ -3,7 +3,7 @@
     "allow": [
       "Bash(rtk npx:*)",
       "Git *",
-      "Edit src/**",
+      "Edit terminal/**",
       "Bash(npx:*)",
       "Read(//c/Users/ravir/.agents/skills/grill-me/**)",
       "Read(//c/Users/ravir/.agents/skills/grill-me//**)",

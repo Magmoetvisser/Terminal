@@ -535,9 +535,10 @@ export default function SettingsScreen() {
               <View style={styles.divider} />
               <TouchableOpacity
                 style={styles.infoRow}
-                onPress={() => {
+                onPress={async () => {
                   setShowUrlDropdown(false);
-                  router.push({ pathname: '/login', params: { prefillUrl: url } } as any);
+                  await logout();
+                  router.replace({ pathname: '/login', params: { prefillUrl: url } } as any);
                 }}
                 activeOpacity={0.7}
               >
