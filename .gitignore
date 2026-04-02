@@ -43,3 +43,8 @@ Thumbs.db
 
 # Claude
 CLAUDE.md
+.claude\settings.local.json
+
+# Set up 
+Backend.bat
+Frontend.bat
