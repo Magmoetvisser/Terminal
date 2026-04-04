@@ -164,6 +164,32 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
+// --- Claude usage helper page ---
+app.get('/claude-push', (req, res) => {
+  const serverOrigin = `${req.protocol}://${req.hostname}:${PORT}`;
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Claude Usage Push</title>
+<style>body{font-family:sans-serif;background:#111;color:#eee;padding:20px;max-width:500px;}button{background:#4ade80;color:#000;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:16px;margin-top:16px;width:100%;}pre{background:#222;padding:12px;border-radius:6px;white-space:pre-wrap;word-break:break-all;font-size:12px;margin-top:16px;}</style></head>
+<body><h2 style="color:#4ade80">Claude Usage → Hussle</h2>
+<p>Klik de knop. Je data wordt naar Hussle gestuurd.</p>
+<button onclick="run()">Stuur gebruiksdata</button>
+<pre id="out">Wachten...</pre>
+<script>
+async function run() {
+  var out = document.getElementById('out');
+  out.textContent = 'Bezig...';
+  try {
+    var orgs = await fetch('https://claude.ai/api/organizations',{credentials:'include'}).then(function(r){return r.json();});
+    var orgId = orgs[0].uuid;
+    var usage = await fetch('https://claude.ai/api/organizations/'+orgId+'/usage',{credentials:'include'}).then(function(r){return r.json();});
+    await fetch('${serverOrigin}/api/claude-usage-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(usage)});
+    out.textContent = 'Klaar! Sessie: '+usage.five_hour.utilization+'% | Wekelijks: '+usage.seven_day.utilization+'%';
+  } catch(e) {
+    out.textContent = 'Fout: '+e.message;
+  }
+}
+</script></body></html>`);
+});
+
 // --- Claude usage limits (push-based via bookmarklet) ---
 let cachedClaudeUsage = null;
 

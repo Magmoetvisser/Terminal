@@ -105,17 +105,15 @@ export default function UsageScreen() {
         <View style={styles.systemCard}>
           {claudeError ? (
             <>
-              <Text style={{ color: '#888', fontSize: 11, marginBottom: 8 }}>
-                Plak dit in de browser console op claude.ai:
+              <Text style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>
+                Open dit adres in Chrome op je PC:
               </Text>
               <TouchableOpacity
-                onPress={() => {
-                  const script = `fetch('/api/organizations').then(r=>r.json()).then(async o=>{const u=await fetch('/api/organizations/'+o[0].uuid+'/usage').then(r=>r.json());await fetch('${serverUrl}/api/claude-usage-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)});console.log('Klaar!',u);})`;
-                  Clipboard.setString(script);
-                }}
-                style={{ backgroundColor: '#1e1e1e', borderRadius: 6, padding: 8, borderWidth: 1, borderColor: '#333' }}
+                onPress={() => Clipboard.setString(`${serverUrl}/claude-push`)}
+                style={{ backgroundColor: '#1e1e1e', borderRadius: 6, padding: 10, borderWidth: 1, borderColor: '#333' }}
               >
-                <Text style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace' }}>Tik om te kopiëren</Text>
+                <Text style={{ color: '#4ade80', fontSize: 12, fontFamily: 'monospace' }}>{serverUrl}/claude-push</Text>
+                <Text style={{ color: '#555', fontSize: 10, marginTop: 4 }}>Tik om te kopiëren</Text>
               </TouchableOpacity>
             </>
           ) : claudeUsage ? (
