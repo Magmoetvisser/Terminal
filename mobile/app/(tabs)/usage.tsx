@@ -6,9 +6,19 @@ import { StatCard, UsageBar } from '../../components/UsageStats';
 import { useApi } from '../../hooks/useApi';
 import { useStore } from '../../store';
 
+function formatResetTime(isoOrLabel: string): string {
+  if (!isoOrLabel) return '';
+  try {
+    const d = new Date(isoOrLabel);
+    return `Reset ${d.toLocaleDateString('nl-NL', { weekday: 'short' })} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    return isoOrLabel;
+  }
+}
+
 export default function UsageScreen() {
   const { apiFetch } = useApi();
-  const { sessions, setSystemInfo } = useStore();
+  const { sessions, setSystemInfo, claudeSessionKey } = useStore();
 
   const {
     data: system,
@@ -35,6 +45,42 @@ export default function UsageScreen() {
     queryFn: () => apiFetch('/api/agents/sessions'),
     refetchInterval: 10000,
   });
+
+  const { data: claudeUsage } = useQuery({
+    queryKey: ['claude-usage', claudeSessionKey],
+    queryFn: async () => {
+      const res = await fetch('https://claude.ai/api/usage_policy', {
+        headers: {
+          Cookie: `sessionKey=${claudeSessionKey}`,
+          'User-Agent': 'Mozilla/5.0',
+        },
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    enabled: !!claudeSessionKey,
+    refetchInterval: 60000,
+    retry: false,
+  });
+
+  // Parse usage — field names adjusted once real endpoint is confirmed
+  const sessionPct: number =
+    claudeUsage?.session?.percentUsed ??
+    claudeUsage?.current_session?.percent_used ??
+    claudeUsage?.sessionPercentUsed ?? 0;
+  const sessionResetMins: number =
+    claudeUsage?.session?.resetInSeconds
+      ? Math.round(claudeUsage.session.resetInSeconds / 60)
+      : claudeUsage?.current_session?.reset_in_minutes ??
+        claudeUsage?.sessionResetInMinutes ?? 0;
+  const weeklyPct: number =
+    claudeUsage?.weekly?.percentUsed ??
+    claudeUsage?.weekly?.percent_used ??
+    claudeUsage?.weeklyPercentUsed ?? 0;
+  const weeklyReset: string =
+    claudeUsage?.weekly?.resetsAt ??
+    claudeUsage?.weekly?.resets_at ??
+    claudeUsage?.weeklyResetsAt ?? '';
 
   const onRefresh = () => {
     refetchSys();
@@ -71,6 +117,31 @@ export default function UsageScreen() {
           color="#facc15"
         />
       </View>
+
+      {/* Claude usage limits */}
+      {claudeSessionKey && (
+        <>
+          <Text style={styles.sectionTitle}>Claude Limieten</Text>
+          <View style={styles.systemCard}>
+            {claudeUsage ? (
+              <>
+                <UsageBar
+                  label={`Sessie (reset over ${sessionResetMins}min)`}
+                  percent={sessionPct}
+                  color={sessionPct > 80 ? '#f87171' : '#60a5fa'}
+                />
+                <UsageBar
+                  label={`Wekelijks — ${formatResetTime(weeklyReset)}`}
+                  percent={weeklyPct}
+                  color={weeklyPct > 80 ? '#f87171' : '#4ade80'}
+                />
+              </>
+            ) : (
+              <Text style={{ color: '#666', fontSize: 12 }}>Laden...</Text>
+            )}
+          </View>
+        </>
+      )}
 
       {/* Active sessions */}
       <Text style={styles.sectionTitle}>Sessies</Text>

@@ -4,19 +4,22 @@ import { useStore } from '../store';
 
 const TOKEN_KEY = 'hussle_jwt';
 const URL_KEY = 'hussle_server_url';
+const CLAUDE_SESSION_KEY = 'hussle_claude_session_key';
 
 export function useAuth() {
-  const { serverUrl, token, setToken, setServerUrl } = useStore();
+  const { serverUrl, token, setToken, setServerUrl, setClaudeSessionKey } = useStore();
 
   const loadStored = useCallback(async () => {
-    const [storedToken, storedUrl] = await Promise.all([
+    const [storedToken, storedUrl, storedClaudeKey] = await Promise.all([
       getItem(TOKEN_KEY),
       getItem(URL_KEY),
+      getItem(CLAUDE_SESSION_KEY),
     ]);
     if (storedToken) setToken(storedToken);
     if (storedUrl) setServerUrl(storedUrl);
+    if (storedClaudeKey) setClaudeSessionKey(storedClaudeKey);
     return { token: storedToken, url: storedUrl };
-  }, [setToken, setServerUrl]);
+  }, [setToken, setServerUrl, setClaudeSessionKey]);
 
   const login = useCallback(
     async (url: string, password: string) => {
@@ -53,7 +56,8 @@ export function useAuth() {
       deleteItem(URL_KEY),
     ]);
     setToken(null);
-  }, [setToken]);
+    setClaudeSessionKey(null);
+  }, [setToken, setClaudeSessionKey]);
 
   return { serverUrl, token, loadStored, login, logout, isAuthenticated: !!token };
 }

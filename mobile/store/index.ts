@@ -58,6 +58,7 @@ interface AppState {
   editorOpenFile: { path: string; name: string; language: string } | null;
   editorMode: 'browse' | 'tree' | 'editor';
   showSplash: boolean;
+  claudeSessionKey: string | null;
 
   setServerUrl: (url: string) => void;
   setToken: (token: string | null) => void;
@@ -76,6 +77,7 @@ interface AppState {
   setEditorOpenFile: (file: { path: string; name: string; language: string } | null) => void;
   setEditorMode: (mode: 'browse' | 'tree' | 'editor') => void;
   setShowSplash: (show: boolean) => void;
+  setClaudeSessionKey: (key: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -94,6 +96,7 @@ export const useStore = create<AppState>((set) => ({
   editorOpenFile: null,
   editorMode: 'browse',
   showSplash: true,
+  claudeSessionKey: null,
 
   setServerUrl: (url) => set({ serverUrl: url }),
   setToken: (token) => set({ token }),
@@ -118,6 +121,7 @@ export const useStore = create<AppState>((set) => ({
   setEditorOpenFile: (file) => set({ editorOpenFile: file }),
   setEditorMode: (mode) => set({ editorMode: mode }),
   setShowSplash: (show) => set({ showSplash: show }),
+  setClaudeSessionKey: (key) => set({ claudeSessionKey: key }),
 }));
 
 export function getAgentSession(agentId: string): string | null {

@@ -228,7 +228,7 @@ function SectionHeader({ icon, title, color: iconColor }: { icon: string; title:
 // --- Main screen ---
 
 export default function SettingsScreen() {
-  const { accentColor, setAccentColor, serverUrl, sessions, githubToken, setGithubToken, terminalFontSize, setTerminalFontSize, setSessions, setActiveSessionId, setShowSplash } = useStore();
+  const { accentColor, setAccentColor, serverUrl, sessions, githubToken, setGithubToken, terminalFontSize, setTerminalFontSize, setSessions, setActiveSessionId, setShowSplash, claudeSessionKey, setClaudeSessionKey } = useStore();
   const { logout } = useAuth();
   const { apiFetch } = useApi();
 
@@ -253,6 +253,10 @@ export default function SettingsScreen() {
   const [ghTokenInput, setGhTokenInput] = useState('');
   const [ghLoading, setGhLoading] = useState(false);
   const [showGhInput, setShowGhInput] = useState(false);
+
+  // Claude session key
+  const [claudeKeyInput, setClaudeKeyInput] = useState(claudeSessionKey || '');
+  const [showClaudeInput, setShowClaudeInput] = useState(false);
 
   // Load stored settings
   useEffect(() => {
@@ -401,6 +405,37 @@ export default function SettingsScreen() {
             setGithubToken(null);
             setGhUsername(null);
             await deleteItem(GITHUB_TOKEN_KEY);
+          },
+        },
+      ],
+    );
+  };
+
+  const saveClaudeKey = async () => {
+    const trimmed = claudeKeyInput.trim();
+    if (trimmed) {
+      await setItem('hussle_claude_session_key', trimmed);
+      setClaudeSessionKey(trimmed);
+    } else {
+      await deleteItem('hussle_claude_session_key');
+      setClaudeSessionKey(null);
+    }
+    setShowClaudeInput(false);
+  };
+
+  const removeClaudeKey = () => {
+    Alert.alert(
+      'Claude sleutel verwijderen',
+      'Weet je zeker dat je de Claude sessie sleutel wilt verwijderen?',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteItem('hussle_claude_session_key');
+            setClaudeSessionKey(null);
+            setClaudeKeyInput('');
           },
         },
       ],
@@ -647,6 +682,55 @@ export default function SettingsScreen() {
                     ) : (
                       <Text style={styles.tokenSaveText}>Opslaan</Text>
                     )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* === CLAUDE SESSIE === */}
+      <View style={styles.section}>
+        <SectionHeader icon="key" title="CLAUDE SESSIE" color={colors.accent} />
+        <Text style={styles.sectionDesc}>sessionKey cookie van claude.ai voor gebruikslimieten</Text>
+        <View style={styles.infoRow}>
+          <View style={[styles.statusDot, { backgroundColor: claudeSessionKey ? colors.accent : colors.textDim }]} />
+          <Text style={[styles.infoValue, { color: claudeSessionKey ? colors.accent : colors.textDim }]}>
+            {claudeSessionKey ? 'Sleutel opgeslagen' : 'Niet ingesteld'}
+          </Text>
+        </View>
+
+        {claudeSessionKey ? (
+          <TouchableOpacity style={styles.dangerBtn} onPress={removeClaudeKey} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={16} color={colors.red} />
+            <Text style={styles.dangerBtnText}>Sleutel verwijderen</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            {!showClaudeInput ? (
+              <TouchableOpacity style={styles.actionBtn} onPress={() => setShowClaudeInput(true)} activeOpacity={0.7}>
+                <Ionicons name="key-outline" size={16} color={colors.accent} />
+                <Text style={styles.actionBtnText}>Sleutel toevoegen</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.tokenInputCard}>
+                <TextInput
+                  style={styles.tokenInput}
+                  placeholder="Plak sessionKey cookie hier..."
+                  placeholderTextColor={colors.textDim}
+                  value={claudeKeyInput}
+                  onChangeText={setClaudeKeyInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                />
+                <View style={styles.tokenActions}>
+                  <TouchableOpacity style={styles.tokenCancelBtn} onPress={() => { setShowClaudeInput(false); setClaudeKeyInput(''); }} activeOpacity={0.7}>
+                    <Text style={styles.tokenCancelText}>Annuleren</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.tokenSaveBtn} onPress={saveClaudeKey} disabled={!claudeKeyInput.trim()} activeOpacity={0.7}>
+                    <Text style={styles.tokenSaveText}>Opslaan</Text>
                   </TouchableOpacity>
                 </View>
               </View>
