@@ -167,7 +167,7 @@ app.get('/api/system', async (req, res) => {
 // --- Claude usage limits (push-based via bookmarklet) ---
 let cachedClaudeUsage = null;
 
-app.post('/api/claude-usage-push', authMiddleware, (req, res) => {
+app.post('/api/claude-usage-push', (req, res) => {
   cachedClaudeUsage = { ...req.body, updatedAt: Date.now() };
   console.log('[claude-usage] received push:', JSON.stringify(cachedClaudeUsage).slice(0, 200));
   res.json({ ok: true });

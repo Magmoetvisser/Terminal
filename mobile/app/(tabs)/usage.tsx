@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Clipboard } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { StatCard, UsageBar } from '../../components/UsageStats';
@@ -18,7 +18,7 @@ function formatResetTime(isoOrLabel: string): string {
 
 export default function UsageScreen() {
   const { apiFetch } = useApi();
-  const { sessions, setSystemInfo } = useStore();
+  const { sessions, setSystemInfo, serverUrl } = useStore();
 
   const {
     data: system,
@@ -104,7 +104,20 @@ export default function UsageScreen() {
         <Text style={styles.sectionTitle}>Claude Limieten</Text>
         <View style={styles.systemCard}>
           {claudeError ? (
-            <Text style={{ color: '#888', fontSize: 11 }}>Voer bookmarklet uit op claude.ai om data te laden</Text>
+            <>
+              <Text style={{ color: '#888', fontSize: 11, marginBottom: 8 }}>
+                Plak dit in de browser console op claude.ai:
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const script = `fetch('/api/organizations').then(r=>r.json()).then(async o=>{const u=await fetch('/api/organizations/'+o[0].uuid+'/usage').then(r=>r.json());await fetch('${serverUrl}/api/claude-usage-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)});console.log('Klaar!',u);})`;
+                  Clipboard.setString(script);
+                }}
+                style={{ backgroundColor: '#1e1e1e', borderRadius: 6, padding: 8, borderWidth: 1, borderColor: '#333' }}
+              >
+                <Text style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace' }}>Tik om te kopiëren</Text>
+              </TouchableOpacity>
+            </>
           ) : claudeUsage ? (
               <>
                 <UsageBar
