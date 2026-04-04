@@ -18,7 +18,7 @@ function formatResetTime(isoOrLabel: string): string {
 
 export default function UsageScreen() {
   const { apiFetch } = useApi();
-  const { sessions, setSystemInfo, claudeSessionKey, claudeOrgId, setClaudeOrgId } = useStore();
+  const { sessions, setSystemInfo } = useStore();
 
   const {
     data: system,
@@ -46,17 +46,10 @@ export default function UsageScreen() {
     refetchInterval: 10000,
   });
 
-  const { data: claudeUsage, error: claudeError, isLoading: claudeLoading } = useQuery({
-    queryKey: ['claude-usage', claudeSessionKey],
-    queryFn: async () => {
-      const headers: Record<string, string> = { 'x-claude-session': claudeSessionKey! };
-      if (claudeOrgId) headers['x-claude-org'] = claudeOrgId;
-      const data = await apiFetch('/api/claude-usage', { headers });
-      if (data?.org_id && !claudeOrgId) setClaudeOrgId(data.org_id);
-      return data;
-    },
-    enabled: !!claudeSessionKey,
-    refetchInterval: 60000,
+  const { data: claudeUsage, error: claudeError } = useQuery({
+    queryKey: ['claude-usage'],
+    queryFn: () => apiFetch('/api/claude-usage'),
+    refetchInterval: 30000,
     retry: false,
   });
 
@@ -107,13 +100,12 @@ export default function UsageScreen() {
       </View>
 
       {/* Claude usage limits */}
-      {claudeSessionKey && (
-        <>
-          <Text style={styles.sectionTitle}>Claude Limieten</Text>
-          <View style={styles.systemCard}>
-            {claudeError ? (
-              <Text style={{ color: '#f87171', fontSize: 11 }}>{String(claudeError)}</Text>
-            ) : claudeUsage ? (
+      <>
+        <Text style={styles.sectionTitle}>Claude Limieten</Text>
+        <View style={styles.systemCard}>
+          {claudeError ? (
+            <Text style={{ color: '#888', fontSize: 11 }}>Voer bookmarklet uit op claude.ai om data te laden</Text>
+          ) : claudeUsage ? (
               <>
                 <UsageBar
                   label={`Sessie (reset over ${minsUntil(sessionResetAt)}min)`}
@@ -126,12 +118,11 @@ export default function UsageScreen() {
                   color={weeklyPct > 80 ? '#f87171' : '#4ade80'}
                 />
               </>
-            ) : (
-              <Text style={{ color: '#666', fontSize: 12 }}>Laden...</Text>
-            )}
-          </View>
-        </>
-      )}
+          ) : (
+            <Text style={{ color: '#666', fontSize: 12 }}>Laden...</Text>
+          )}
+        </View>
+      </>
 
       {/* Active sessions */}
       <Text style={styles.sectionTitle}>Sessies</Text>

@@ -164,37 +164,18 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
-// --- Claude usage limits ---
-app.get('/api/claude-usage', authMiddleware, async (req, res) => {
-  const cookieString = req.headers['x-claude-session'];
-  if (!cookieString) return res.status(400).json({ error: 'Missing x-claude-session header' });
-  try {
-    const curlFetch = (url) => new Promise((resolve, reject) => {
-      execFile('curl.exe', [
-        '-s', '-L',
-        '-H', `Cookie: ${cookieString}`,
-        '-H', 'Accept: application/json',
-        '-H', 'Referer: https://claude.ai/settings/usage',
-        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
-        url,
-      ], { timeout: 10000 }, (err, stdout, stderr) => {
-        if (err) return reject(err);
-        try { resolve(JSON.parse(stdout)); } catch { reject(new Error(`Non-JSON: ${stdout.slice(0, 200)}`)); }
-      });
-    });
+// --- Claude usage limits (push-based via bookmarklet) ---
+let cachedClaudeUsage = null;
 
-    const resolvedOrgId = req.headers['x-claude-org'] || await (async () => {
-      const orgs = await curlFetch('https://claude.ai/api/organizations');
-      console.log('[claude-usage] orgs:', JSON.stringify(orgs).slice(0, 300));
-      return Array.isArray(orgs) ? (orgs[0]?.uuid || orgs[0]?.id) : (orgs?.uuid || orgs?.id);
-    })();
-    if (!resolvedOrgId) return res.status(500).json({ error: 'No org found' });
-    const usage = await curlFetch(`https://claude.ai/api/organizations/${resolvedOrgId}/usage`);
-    console.log('[claude-usage] usage:', JSON.stringify(usage).slice(0, 300));
-    res.json({ ...usage, org_id: resolvedOrgId });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+app.post('/api/claude-usage-push', authMiddleware, (req, res) => {
+  cachedClaudeUsage = { ...req.body, updatedAt: Date.now() };
+  console.log('[claude-usage] received push:', JSON.stringify(cachedClaudeUsage).slice(0, 200));
+  res.json({ ok: true });
+});
+
+app.get('/api/claude-usage', authMiddleware, (req, res) => {
+  if (!cachedClaudeUsage) return res.status(404).json({ error: 'No data yet — run the bookmarklet on claude.ai' });
+  res.json(cachedClaudeUsage);
 });
 
 // --- Project creation ---
