@@ -167,27 +167,23 @@ app.get('/api/system', async (req, res) => {
 // --- Claude usage helper page ---
 app.get('/claude-push', (req, res) => {
   const serverOrigin = `${req.protocol}://${req.hostname}:${PORT}`;
+  const script = `fetch('/api/organizations').then(function(r){return r.json();}).then(function(o){var id=o[0].uuid;return fetch('/api/organizations/'+id+'/usage').then(function(r){return r.json();}).then(function(u){return fetch('${serverOrigin}/api/claude-usage-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(u)}).then(function(){console.log('Klaar! Sessie:'+u.five_hour.utilization+'% Wekelijks:'+u.seven_day.utilization+'%');});});});`;
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Claude Usage Push</title>
-<style>body{font-family:sans-serif;background:#111;color:#eee;padding:20px;max-width:500px;}button{background:#4ade80;color:#000;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:16px;margin-top:16px;width:100%;}pre{background:#222;padding:12px;border-radius:6px;white-space:pre-wrap;word-break:break-all;font-size:12px;margin-top:16px;}</style></head>
-<body><h2 style="color:#4ade80">Claude Usage → Hussle</h2>
-<p>Klik de knop. Je data wordt naar Hussle gestuurd.</p>
-<button onclick="run()">Stuur gebruiksdata</button>
-<pre id="out">Wachten...</pre>
-<script>
-async function run() {
-  var out = document.getElementById('out');
-  out.textContent = 'Bezig...';
-  try {
-    var orgs = await fetch('https://claude.ai/api/organizations',{credentials:'include'}).then(function(r){return r.json();});
-    var orgId = orgs[0].uuid;
-    var usage = await fetch('https://claude.ai/api/organizations/'+orgId+'/usage',{credentials:'include'}).then(function(r){return r.json();});
-    await fetch('${serverOrigin}/api/claude-usage-push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(usage)});
-    out.textContent = 'Klaar! Sessie: '+usage.five_hour.utilization+'% | Wekelijks: '+usage.seven_day.utilization+'%';
-  } catch(e) {
-    out.textContent = 'Fout: '+e.message;
-  }
-}
-</script></body></html>`);
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;padding:24px;max-width:560px;}
+h2{color:#4ade80;}
+p{color:#aaa;line-height:1.6;}
+textarea{width:100%;height:80px;background:#1e1e1e;color:#4ade80;border:1px solid #333;border-radius:6px;padding:10px;font-family:monospace;font-size:11px;resize:none;box-sizing:border-box;}
+button{background:#4ade80;color:#000;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:14px;margin-top:8px;}
+</style></head>
+<body>
+<h2>Claude Usage → Hussle</h2>
+<p>1. Ga naar <a href="https://claude.ai" style="color:#60a5fa" target="_blank">claude.ai</a> en log in<br>
+2. Druk <strong>F12</strong> → <strong>Console</strong><br>
+3. Kopieer het script hieronder en plak het in de console → Enter</p>
+<textarea id="s" readonly onclick="this.select()">${script}</textarea>
+<br><button onclick="document.getElementById('s').select();document.execCommand('copy');this.textContent='Gekopieerd!'">Kopieer script</button>
+</body></html>`);
 });
 
 // --- Claude usage limits (push-based via bookmarklet) ---
