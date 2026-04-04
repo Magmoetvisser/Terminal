@@ -228,7 +228,7 @@ function SectionHeader({ icon, title, color: iconColor }: { icon: string; title:
 // --- Main screen ---
 
 export default function SettingsScreen() {
-  const { accentColor, setAccentColor, serverUrl, sessions, githubToken, setGithubToken, terminalFontSize, setTerminalFontSize, setSessions, setActiveSessionId, setShowSplash, claudeSessionKey, setClaudeSessionKey } = useStore();
+  const { accentColor, setAccentColor, serverUrl, sessions, githubToken, setGithubToken, terminalFontSize, setTerminalFontSize, setSessions, setActiveSessionId, setShowSplash, claudeSessionKey, setClaudeSessionKey, claudeOrgId, setClaudeOrgId } = useStore();
   const { logout } = useAuth();
   const { apiFetch } = useApi();
 
@@ -257,6 +257,7 @@ export default function SettingsScreen() {
   // Claude session key
   const [claudeKeyInput, setClaudeKeyInput] = useState(claudeSessionKey || '');
   const [showClaudeInput, setShowClaudeInput] = useState(false);
+  const [claudeOrgInput, setClaudeOrgInput] = useState(claudeOrgId || '');
 
   // Load stored settings
   useEffect(() => {
@@ -419,6 +420,11 @@ export default function SettingsScreen() {
     } else {
       await deleteItem('hussle_claude_session_key');
       setClaudeSessionKey(null);
+    }
+    const orgTrimmed = claudeOrgInput.trim();
+    if (orgTrimmed) {
+      await setItem('hussle_claude_org_id', orgTrimmed);
+      setClaudeOrgId(orgTrimmed);
     }
     setShowClaudeInput(false);
   };
@@ -724,6 +730,15 @@ export default function SettingsScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   secureTextEntry
+                />
+                <TextInput
+                  style={[styles.tokenInput, { marginTop: 8 }]}
+                  placeholder="Org ID (ebe5d062-... uit de URL)"
+                  placeholderTextColor={colors.textDim}
+                  value={claudeOrgInput}
+                  onChangeText={setClaudeOrgInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
                 <View style={styles.tokenActions}>
                   <TouchableOpacity style={styles.tokenCancelBtn} onPress={() => { setShowClaudeInput(false); setClaudeKeyInput(''); }} activeOpacity={0.7}>

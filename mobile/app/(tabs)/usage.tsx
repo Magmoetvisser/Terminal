@@ -18,7 +18,7 @@ function formatResetTime(isoOrLabel: string): string {
 
 export default function UsageScreen() {
   const { apiFetch } = useApi();
-  const { sessions, setSystemInfo, claudeSessionKey } = useStore();
+  const { sessions, setSystemInfo, claudeSessionKey, claudeOrgId, setClaudeOrgId } = useStore();
 
   const {
     data: system,
@@ -48,9 +48,13 @@ export default function UsageScreen() {
 
   const { data: claudeUsage, error: claudeError, isLoading: claudeLoading } = useQuery({
     queryKey: ['claude-usage', claudeSessionKey],
-    queryFn: () => apiFetch('/api/claude-usage', {
-      headers: { 'x-claude-session': claudeSessionKey! },
-    }),
+    queryFn: async () => {
+      const headers: Record<string, string> = { 'x-claude-session': claudeSessionKey! };
+      if (claudeOrgId) headers['x-claude-org'] = claudeOrgId;
+      const data = await apiFetch('/api/claude-usage', { headers });
+      if (data?.org_id && !claudeOrgId) setClaudeOrgId(data.org_id);
+      return data;
+    },
     enabled: !!claudeSessionKey,
     refetchInterval: 60000,
     retry: false,

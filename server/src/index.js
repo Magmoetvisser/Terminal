@@ -184,10 +184,15 @@ app.get('/api/claude-usage', authMiddleware, async (req, res) => {
     });
 
     const orgs = await curlFetch('https://claude.ai/api/organizations');
-    const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
-    if (!orgId) return res.status(500).json({ error: 'No org found', orgs });
-    const usage = await curlFetch(`https://claude.ai/api/organizations/${orgId}/usage`);
-    res.json(usage);
+    console.log('[claude-usage] orgs:', JSON.stringify(orgs).slice(0, 300));
+    const orgId = Array.isArray(orgs)
+      ? (orgs[0]?.uuid || orgs[0]?.id)
+      : (orgs?.uuid || orgs?.id);
+    const fallbackOrgId = req.headers['x-claude-org'];
+    const resolvedOrgId = orgId || fallbackOrgId;
+    if (!resolvedOrgId) return res.status(500).json({ error: 'No org found', orgs });
+    const usage = await curlFetch(`https://claude.ai/api/organizations/${resolvedOrgId}/usage`);
+    res.json({ ...usage, org_id: resolvedOrgId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
