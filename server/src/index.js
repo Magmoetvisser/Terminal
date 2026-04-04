@@ -178,11 +178,15 @@ app.get('/api/claude-usage', authMiddleware, async (req, res) => {
       'Referer': 'https://claude.ai/settings/usage',
       'Origin': 'https://claude.ai',
     };
-    const orgsRes = await axios.get('https://claude.ai/api/organizations', { headers });
+    const orgsRes = await axios.get('https://claude.ai/api/organizations', { headers, validateStatus: null });
+    console.log('[claude-usage] orgs status:', orgsRes.status, JSON.stringify(orgsRes.data).slice(0, 200));
+    if (orgsRes.status !== 200) return res.status(orgsRes.status).json({ error: `claude.ai orgs returned ${orgsRes.status}`, detail: orgsRes.data });
     const orgs = orgsRes.data;
     const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
-    if (!orgId) return res.status(500).json({ error: 'No org found' });
-    const usageRes = await axios.get(`https://claude.ai/api/organizations/${orgId}/usage`, { headers });
+    if (!orgId) return res.status(500).json({ error: 'No org found', orgs });
+    const usageRes = await axios.get(`https://claude.ai/api/organizations/${orgId}/usage`, { headers, validateStatus: null });
+    console.log('[claude-usage] usage status:', usageRes.status, JSON.stringify(usageRes.data).slice(0, 200));
+    if (usageRes.status !== 200) return res.status(usageRes.status).json({ error: `claude.ai usage returned ${usageRes.status}`, detail: usageRes.data });
     res.json(usageRes.data);
   } catch (err) {
     res.status(500).json({ error: err.message });
