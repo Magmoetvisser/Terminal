@@ -49,38 +49,33 @@ export default function UsageScreen() {
   const { data: claudeUsage } = useQuery({
     queryKey: ['claude-usage', claudeSessionKey],
     queryFn: async () => {
-      const res = await fetch('https://claude.ai/api/usage_policy', {
-        headers: {
-          Cookie: `sessionKey=${claudeSessionKey}`,
-          'User-Agent': 'Mozilla/5.0',
-        },
-      });
-      if (!res.ok) throw new Error('Failed');
-      return res.json();
+      const headers = {
+        Cookie: `sessionKey=${claudeSessionKey}`,
+        'User-Agent': 'Mozilla/5.0',
+      };
+      const orgsRes = await fetch('https://claude.ai/api/organizations', { headers });
+      if (!orgsRes.ok) throw new Error('Failed to fetch orgs');
+      const orgs = await orgsRes.json();
+      const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
+      if (!orgId) throw new Error('No org found');
+      const usageRes = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, { headers });
+      if (!usageRes.ok) throw new Error('Failed to fetch usage');
+      return usageRes.json();
     },
     enabled: !!claudeSessionKey,
     refetchInterval: 60000,
     retry: false,
   });
 
-  // Parse usage — field names adjusted once real endpoint is confirmed
-  const sessionPct: number =
-    claudeUsage?.session?.percentUsed ??
-    claudeUsage?.current_session?.percent_used ??
-    claudeUsage?.sessionPercentUsed ?? 0;
-  const sessionResetMins: number =
-    claudeUsage?.session?.resetInSeconds
-      ? Math.round(claudeUsage.session.resetInSeconds / 60)
-      : claudeUsage?.current_session?.reset_in_minutes ??
-        claudeUsage?.sessionResetInMinutes ?? 0;
-  const weeklyPct: number =
-    claudeUsage?.weekly?.percentUsed ??
-    claudeUsage?.weekly?.percent_used ??
-    claudeUsage?.weeklyPercentUsed ?? 0;
-  const weeklyReset: string =
-    claudeUsage?.weekly?.resetsAt ??
-    claudeUsage?.weekly?.resets_at ??
-    claudeUsage?.weeklyResetsAt ?? '';
+  const sessionPct: number = claudeUsage?.five_hour?.utilization ?? 0;
+  const sessionResetAt: string = claudeUsage?.five_hour?.resets_at ?? '';
+  const weeklyPct: number = claudeUsage?.seven_day?.utilization ?? 0;
+  const weeklyReset: string = claudeUsage?.seven_day?.resets_at ?? '';
+
+  function minsUntil(iso: string): number {
+    if (!iso) return 0;
+    return Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 60000));
+  }
 
   const onRefresh = () => {
     refetchSys();
@@ -126,7 +121,7 @@ export default function UsageScreen() {
             {claudeUsage ? (
               <>
                 <UsageBar
-                  label={`Sessie (reset over ${sessionResetMins}min)`}
+                  label={`Sessie (reset over ${minsUntil(sessionResetAt)}min)`}
                   percent={sessionPct}
                   color={sessionPct > 80 ? '#f87171' : '#60a5fa'}
                 />
