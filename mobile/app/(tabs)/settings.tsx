@@ -693,7 +693,7 @@ export default function SettingsScreen() {
       {/* === CLAUDE SESSIE === */}
       <View style={styles.section}>
         <SectionHeader icon="key" title="CLAUDE SESSIE" color={colors.accent} />
-        <Text style={styles.sectionDesc}>sessionKey cookie van claude.ai voor gebruikslimieten</Text>
+        <Text style={styles.sectionDesc}>Volledige cookie string van claude.ai (Network tab → request headers → cookie:)</Text>
         <View style={styles.infoRow}>
           <View style={[styles.statusDot, { backgroundColor: claudeSessionKey ? colors.accent : colors.textDim }]} />
           <Text style={[styles.infoValue, { color: claudeSessionKey ? colors.accent : colors.textDim }]}>
@@ -717,7 +717,7 @@ export default function SettingsScreen() {
               <View style={styles.tokenInputCard}>
                 <TextInput
                   style={styles.tokenInput}
-                  placeholder="Plak sessionKey cookie hier..."
+                  placeholder="sessionKey=...; cf_clearance=...; ..."
                   placeholderTextColor={colors.textDim}
                   value={claudeKeyInput}
                   onChangeText={setClaudeKeyInput}
