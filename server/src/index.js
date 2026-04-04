@@ -164,6 +164,24 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
+// --- Claude usage limits ---
+app.get('/api/claude-usage', authMiddleware, async (req, res) => {
+  const sessionKey = req.headers['x-claude-session'];
+  if (!sessionKey) return res.status(400).json({ error: 'Missing x-claude-session header' });
+  try {
+    const axios = require('axios');
+    const headers = { Cookie: `sessionKey=${sessionKey}`, 'User-Agent': 'Mozilla/5.0' };
+    const orgsRes = await axios.get('https://claude.ai/api/organizations', { headers });
+    const orgs = orgsRes.data;
+    const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
+    if (!orgId) return res.status(500).json({ error: 'No org found' });
+    const usageRes = await axios.get(`https://claude.ai/api/organizations/${orgId}/usage`, { headers });
+    res.json(usageRes.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Project creation ---
 app.post('/api/project', (req, res) => {
   const { name, parentDir } = req.body;

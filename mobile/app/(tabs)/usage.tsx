@@ -46,22 +46,11 @@ export default function UsageScreen() {
     refetchInterval: 10000,
   });
 
-  const { data: claudeUsage } = useQuery({
+  const { data: claudeUsage, error: claudeError, isLoading: claudeLoading } = useQuery({
     queryKey: ['claude-usage', claudeSessionKey],
-    queryFn: async () => {
-      const headers = {
-        Cookie: `sessionKey=${claudeSessionKey}`,
-        'User-Agent': 'Mozilla/5.0',
-      };
-      const orgsRes = await fetch('https://claude.ai/api/organizations', { headers });
-      if (!orgsRes.ok) throw new Error('Failed to fetch orgs');
-      const orgs = await orgsRes.json();
-      const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
-      if (!orgId) throw new Error('No org found');
-      const usageRes = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, { headers });
-      if (!usageRes.ok) throw new Error('Failed to fetch usage');
-      return usageRes.json();
-    },
+    queryFn: () => apiFetch('/api/claude-usage', {
+      headers: { 'x-claude-session': claudeSessionKey! },
+    }),
     enabled: !!claudeSessionKey,
     refetchInterval: 60000,
     retry: false,
@@ -118,7 +107,9 @@ export default function UsageScreen() {
         <>
           <Text style={styles.sectionTitle}>Claude Limieten</Text>
           <View style={styles.systemCard}>
-            {claudeUsage ? (
+            {claudeError ? (
+              <Text style={{ color: '#f87171', fontSize: 11 }}>{String(claudeError)}</Text>
+            ) : claudeUsage ? (
               <>
                 <UsageBar
                   label={`Sessie (reset over ${minsUntil(sessionResetAt)}min)`}
