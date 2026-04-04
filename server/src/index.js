@@ -166,28 +166,28 @@ app.get('/api/system', async (req, res) => {
 
 // --- Claude usage limits ---
 app.get('/api/claude-usage', authMiddleware, async (req, res) => {
-  const sessionKey = req.headers['x-claude-session'];
-  if (!sessionKey) return res.status(400).json({ error: 'Missing x-claude-session header' });
+  const cookieString = req.headers['x-claude-session'];
+  if (!cookieString) return res.status(400).json({ error: 'Missing x-claude-session header' });
   try {
-    const axios = require('axios');
-    const headers = {
-      Cookie: sessionKey,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'application/json',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://claude.ai/settings/usage',
-      'Origin': 'https://claude.ai',
-    };
-    const orgsRes = await axios.get('https://claude.ai/api/organizations', { headers, validateStatus: null });
-    console.log('[claude-usage] orgs status:', orgsRes.status, JSON.stringify(orgsRes.data).slice(0, 200));
-    if (orgsRes.status !== 200) return res.status(orgsRes.status).json({ error: `claude.ai orgs returned ${orgsRes.status}`, detail: orgsRes.data });
-    const orgs = orgsRes.data;
+    const curlFetch = (url) => new Promise((resolve, reject) => {
+      execFile('curl.exe', [
+        '-s', '-L',
+        '-H', `Cookie: ${cookieString}`,
+        '-H', 'Accept: application/json',
+        '-H', 'Referer: https://claude.ai/settings/usage',
+        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        url,
+      ], { timeout: 10000 }, (err, stdout, stderr) => {
+        if (err) return reject(err);
+        try { resolve(JSON.parse(stdout)); } catch { reject(new Error(`Non-JSON: ${stdout.slice(0, 200)}`)); }
+      });
+    });
+
+    const orgs = await curlFetch('https://claude.ai/api/organizations');
     const orgId = Array.isArray(orgs) ? orgs[0]?.uuid : orgs?.uuid;
     if (!orgId) return res.status(500).json({ error: 'No org found', orgs });
-    const usageRes = await axios.get(`https://claude.ai/api/organizations/${orgId}/usage`, { headers, validateStatus: null });
-    console.log('[claude-usage] usage status:', usageRes.status, JSON.stringify(usageRes.data).slice(0, 200));
-    if (usageRes.status !== 200) return res.status(usageRes.status).json({ error: `claude.ai usage returned ${usageRes.status}`, detail: usageRes.data });
-    res.json(usageRes.data);
+    const usage = await curlFetch(`https://claude.ai/api/organizations/${orgId}/usage`);
+    res.json(usage);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
